@@ -1,0 +1,27 @@
+# Closed model 1 from Kery and Schaub 2012. p. 158
+# Mtbh
+
+model {
+   # priors
+  Omega ~ dunif(0, 1)
+  for (j in 1:J){   
+    p[j] ~ dunif(0, 1)
+    c[j] ~ dunif(0, 1)
+  }
+  
+  # likelihood
+  for (i in 1:I){
+    z[i] ~ dbern(Omega)
+
+    # first occasion
+    yaug[i, 1] ~ dbern(p.eff[i,1])
+    p.eff[i,1] <- z[i] * p[1]
+
+    for (j in 2:J){
+      yaug[i, j] ~ dbern(p.eff[i,j])
+      p.eff[i, j] <- z[i] * ((1 - yaug[i, (j-1)]) * p[j] + yaug[i, (j-1)] * c[j])
+    }
+  }
+
+  N <- sum(z[])
+}

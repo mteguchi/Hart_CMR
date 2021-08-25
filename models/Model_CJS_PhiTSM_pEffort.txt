@@ -1,0 +1,63 @@
+# Cormack-Jolly-Seber model with survival with time-since-marking 
+# on survival - converted from trap response model on p.212 of Kery and 
+# Schaub
+
+# There are two survival rates, which correspond to the year after the first marking and the rest. 
+# Capture probabilities are modeled as a function of survey effort (linear in the logit scale). 
+#
+# The time since marking (TSM) models are described well in Chapter 7
+# of the MARK book. Starting around p. 7-40, they describe how the survival
+# rates of the first and the rest provide evidence for transients. In the
+# sidebar on p. 7-44 explains how the ratio between the two estimated
+# survival rates from a TSM model can be used to estimate the proportion of 
+# transients (or residents).  
+
+
+model {
+
+  for (i in 1:nind){
+     for (t in f[i] : (n.occasions-1)){
+        phi[i, t] <- gamma[m[i,t]]
+
+     }
+  }
+
+  for (t in 1:T){
+     logit(p[t]) <- mu + beta * x[t] + epsilon[t]
+     epsilon[t] ~ dnorm(0, 1/var_logitP)
+     N[t] <- n[t]/p[t]
+     
+  }
+  
+  for (u in 1:2){
+     gamma[u] ~ dbeta(5, 2)
+  }
+
+  prop.trans <- 1 - (gamma[1]/gamma[2])
+  mean.p ~ dbeta(5, 2) #unif(0,1)
+  mu <- log(mean.p / (1 - mean.p))
+
+  beta ~ dnorm(0, 0.01)
+  var_logitP ~ dgamma(5, 0.1)
+  sigma_logitP <- sqrt(var_logitP)
+  #tau <- pow(sigma, -2)
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i,t-1] ^ dt[t]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[t-1] * z[i,t]
+      loglik[i,t] <- logdensity.bern(y[i,t], mu2[i,t])
+    }
+  }
+
+}
+
+

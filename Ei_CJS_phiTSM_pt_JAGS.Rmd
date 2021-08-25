@@ -1,0 +1,168 @@
+---
+title: "Capture recapture analyses of greens for Agnese Mancini"
+output: html_notebook
+---
+
+This document describes data analysis of Agnese Mancini's data of green turtle capture recapture events of green  turtles using the augmented method (Kery and Schaub). To save computational time, I used MARK to select the best model (phiTSM, pt), and run just one model in this analysis. 
+
+
+Initialize the workspace
+```{r}
+rm(list=ls())
+library(jagsUI)
+library(tidyverse)
+library(lubridate)
+library(reshape)
+library(bayesplot)
+library(ggridges)
+
+source("Mancini_functions.R")
+
+MCMC.params <- list(n.samples = 50000,
+                    n.burnin = 30000,
+                    n.thin = 5,
+                    n.chains = 5)
+
+```
+
+Bring in the data file and get ready for CJS
+
+```{r}
+
+dat.1.Cm <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE_v2.csv")
+#dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
+
+CJS.data <- dat2CJS(dat.1.Cm, save.file = FALSE)
+
+CJS.data$data %>% rownames_to_column(var = "ID") -> data.CJS
+
+# Number of years between occasions. 
+cap.dates <- paste0(colnames(CJS.data$data), "-01")
+delta.dates <- signif(as.numeric(as.Date(cap.dates[2:length(cap.dates)]) -
+                                   as.Date(cap.dates[1:(length(cap.dates)-1)]))/365, 1)
+
+# capture history
+CH <- as.matrix(CJS.data$data)
+
+nInd <- nrow(CJS.data$data)
+
+ns <- colSums(CJS.data$data)
+
+# find the first capture date
+get.first <- function(x) min(which(x != 0))
+f <- apply(CH, 1, get.first)
+
+jags.data <- list(y = CH, 
+                  f = f, 
+                  nind = nInd, 
+                  n.occasions = dim(CH)[2],
+                  n = ns, 
+                  T = ncol(CJS.data$data),
+                  dt = c(0, delta.dates))
+
+
+# initial values - when removing z, no input
+# initsFunction <- function(ch){
+#   mean.phi <- rbeta(1,2,2)
+#   mean.p <- rbeta(1,2,2)
+#   z <- known.state.cjs(ch)
+#   b <- rnorm(1, 0, 50)
+#   A <- list(mean.phi = mean.phi, mean.p = mean.p, z = z, beta = b)
+#   return(A)
+# }
+```
+
+
+Then run JAGS:
+
+Time-since-marking - looking at the transients effect on survival 
+```{r}
+
+if (!file.exists(paste0("RData/CJS_PhiTSM_pt_N_logistic_Cm_JAGS.rds"))){
+  MCMC.params$model.file <- "models/Model_CJS_PhiTSM_pt_N_logistic.txt"
+  
+  first.cap <- jags.data$f
+  m <- matrix(data = 2, nrow = nrow(CH), ncol = ncol(CH))
+  for (k in 1:nrow(m)){
+    m[k, first.cap[k]] <- 1
+  }
+  
+  jags.data$m <- m
+  
+  ## parameters to monitor - when this is changed, make sure to change
+  ## summary statistics indices at the end of this script. 
+  parameters <- c("gamma", "p", "N", "prop.trans", 
+                  "mu_N", "sigma_N", "r", "K",
+                  "deviance", "loglik")
+  
+  jm.PhiTSM.pt.N.logistic <- jags(data = jags.data,
+                                  #inits = inits,
+                                  parameters.to.save= parameters,
+                                  model.file = MCMC.params$model.file,
+                                  n.chains = MCMC.params$n.chains,
+                                  n.burnin = MCMC.params$n.burnin,
+                                  n.thin = MCMC.params$n.thin,
+                                  n.iter = MCMC.params$n.samples,
+                                  DIC = T, 
+                                  parallel=T)
+  
+  out.list <- list(jags.out = jm.PhiTSM.pt.N.logistic,
+                   jags.data = jags.data)
+  
+  saveRDS(out.list, 
+          file = paste0("RData/CJS_PhiTSM_pt_N_logistic_Cm_JAGS.rds"))
+} else {
+  phiTSM.pt.N.logistic <- readRDS(file = "RData/CJS_PhiTSM_pt_N_logistic_Cm_JAGS.rds")
+
+}
+```
+
+
+START HERE AFTER RUNNING JAGS - 2020-08-28
+
+```{r}
+mcmc_dens(phiAgeClass.pt$jags.out$samples, c("gamma[1]", "gamma[2]"))
+```
+
+
+```{r}
+gamma.stats <- phiAgeClass.pt$jags.out$summary[grep("gamma", 
+                                               dimnames(phiAgeClass.pt$jags.out$summary)[[1]]),]
+gamma.stats
+```
+
+
+```{r}
+p.stats <- phiAgeClass.pt$jags.out$summary[grep("p[", 
+                                           dimnames(phiAgeClass.pt$jags.out$summary)[[1]],
+                                           fixed = TRUE),]
+p.stats
+```
+
+
+Survival rates of residents were about 0.6/yr.  Kinda low... 
+
+Using the H-T estimator, we also computed the abundance for each sampling occasion:
+
+```{r}
+N.stats <- phiAgeClass.pt$jags.out$summary[grep("N[", 
+                                           dimnames(phiAgeClass.pt$jags.out$summary)[[1]],
+                                           fixed = TRUE),]
+
+N.stats.df <- data.frame(N.stats)
+
+N.stats.df$season <- colnames(CH.2)
+
+N.stats.df
+```
+
+
+```{r}
+ggplot(data = N.stats.df) +
+  geom_point(aes(x = season, y = X50.)) + 
+  geom_errorbar(aes(x = season, ymin = X2.5., ymax = X97.5.)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5)) + 
+  ylab("Abundance") + xlab("")
+
+```
+

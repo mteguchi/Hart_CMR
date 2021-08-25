@@ -1,0 +1,87 @@
+# Jolly-Seber model as a superpopulation model - p.326 on Kery and 
+# Schaub
+
+model {
+
+	# priors and conatraints
+	for (i in 1:m){
+		for (t in 1:(n.occasions - 1)){
+			phi[i, t] <- mean.phi
+		}
+		# prior for entry probability
+		for (t in 1:n.occaions){
+			p[i, t] <- mean.p
+		}
+	}
+
+	# priors for mean survival, mean capture, and inclusion probabilities
+	mean.phi ~ dunif(0, 1)
+	mean.p ~ dunif(0, 1)
+	psi ~ dunif(0, 1)
+
+	# dirichlet prior for entr probabilities
+	for (t in 1:n.occaions){
+		beta[t] ~ dgamma(1, 1)
+		b[t] <- beta[t] / sum(beta[1:n.occasions])
+	}
+
+	# convert entry probabilities to conditional entry probabilities
+	nu[1] <- b[1]
+	for (t in 2:n.occasions){
+		nu[t] <- b[t] / (1 - sum(b[1:(t-1)]))
+	}
+
+	# Likelihood
+	for (i in 1:M){
+		# first occasion
+		# state process
+		w[i] ~ dbern(psi)
+		z[i, 1] ~ dbern(nu[1])
+
+		# observation process
+		mu1[i] <- z[i, 1] * p[i, 1] * w[i]
+		y[i, 1] ~ dbern(mu1[i])
+
+		# subsequent occasions
+		for (t in 2:n.occasions){
+			# state process: 
+			q[i, t-1] <- 1 - z[i, t-1]
+			mu2[i, t] <- phi[i, t-1] * z[i, t-1] + nu[t] * prod(q[i, 1:(t-1)])
+			z[i, t] ~ dbern(mu2[i, t])
+			# observation process: 
+			y[i, t] ~ dbern(mu3[i, t])
+		}
+	}
+
+	# calculate derived population parameters
+	for (i in 1:M){
+		for (t in 1:(n.occasions)){
+			# deflated latent state
+			u[i, t] <- z[i, t] * w[i]
+		}
+	}
+
+	for (i in 1:M){
+		recruit[i, 1] <- u[i, 1]
+		for (t in 2:(n.occaions - 1)){
+			recruit[i, t] <- (1 - u[i, t-1]) * u[i, t]
+		}
+	}
+
+	for (t in 1:(n.occasions)){
+		# actual population size	
+		N[t] <- sum(u[1:M, t])
+		# number of entries
+		B[t] <- sum(recruit[1:M, t])
+	}
+
+	for (i in 1:M){
+		Nind[i] <- sum(u[i, 1:n.occasions])
+		Nalive[i] <- 1 - equals(Nind[i], 0)
+	}
+	
+	# super population size
+	Nsuper <- sum(Nalive[])
+}
+
+

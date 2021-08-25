@@ -1,0 +1,54 @@
+# Cormack-Jolly-Seber model for nesting turtles
+# Incorporates low capture probability the year after
+# a capture. 
+# Based on p.179 on Kery and Schaub
+
+model {
+  for (i in 1:nind){
+    phi[i] ~ dbeta(phi_alpha, phi_beta)
+  }
+  
+  for (t in 1:n.occasions){
+    p[t] ~ dbeta(p_alpha, p_beta)
+  }
+  
+  phi_alpha ~ dnorm(0, 0.01)I(0,)
+  phi_beta ~ dnorm(0, 0.01)I(0,)
+  mean.phi <- phi_alpha/(phi_alpha + phi_beta)
+
+  p_alpha ~ dunif(0.0, 12)
+  p_beta ~ dunif(0.0, 12)
+  mean.p <- p_alpha/(p_alpha + p_beta)
+
+  #mean.p ~ dunif(0,1)
+  beta0 ~ dnorm(0, 0.01)
+  beta1 ~ dnorm(0, 0.010)
+  beta2 ~ dnorm(0, 0.010)
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1   # whether or not it is alive    
+    # n is the nesting probability
+    n[i, f[i]] <- 1
+    p.eff[i,f[i]] <- z[i, f[i]] * n[i, f[i]] * p[f[i]]
+    
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])     # whehter or not it is alive
+      mu1[i,t] <- phi[i] * z[i, t-1]
+      
+      n[i, t] ~ dbern(p.n[i,t])    # whether or not it nests
+            
+      logit(p.n[i,t]) <- beta0 + beta1 * RI[i,t] + beta2 * RI[i,t] * RI[i,t]
+      
+      # observation process
+      y[i,t] ~ dbern(p.eff[i,t])      
+      p.eff[i, t] <- z[i, t] * n[i,t] * p[t]      
+      
+    }
+  }
+
+}
+
+

@@ -1,0 +1,109 @@
+# Jolly-Seber model as a multi-state model - p.324 on Kery and 
+# Schaub
+
+model {
+
+	# parameters
+	# phi: survival probability
+	# gamma: removal entry probability
+	# p: capture probability
+
+	# States (S)
+	# 1: not yet entered
+	# 2: alive
+	# 3: dead
+
+	# Observation (O)
+	# 1: seen
+	# 2: not seen
+
+	# priors and conatraints
+	for (t in 1:(n.occasions - 1)){
+		phi[t] <- mean.phi
+		# prior for entry probability
+		gamma[t] ~ dunif(0, 1)		
+		#p[t] <- mean.p
+	}
+
+	# priors for mean survival and capture probabilities
+	mean.phi ~ dunif(0, 1)
+	mean.p ~ dunif(0, 1)
+
+	# define state-transition and observation matrices
+	for (i in 1:M){
+		for (t in 1:(n.occasions - 1)){
+			# Define probabilities of state S(t+1) given S(t)
+			ps[1, i, t, 1] <- 1 - gamma[t]
+			ps[1, i, t, 2] <- gamma[t]
+			ps[1, i, t, 3] <- 0
+			ps[2, i, t, 1] <- 0
+			ps[2, i, t, 2]	<- phi[t]
+			ps[2, i, t, 3] <- 1 - phi[t]
+			ps[3, i, t, 1] <- 0
+			ps[3, i, t, 2] <- 0
+			ps[3, i, t, 3] <- 1
+
+			po[1, i, t, 1] <- 0
+			po[1, i, t, 2] <- 1
+			po[2, i, t, 1] <- mean.p
+			po[2, i, t, 2] <- 1 - mean.p
+			po[3, i, t, 1] <- 0
+			po[3, i, t, 2] <- 1
+		}
+	}			
+	
+	# Likelihood
+	for (i in 1:M){
+		# define latent state at first occasion
+		# all M individuals are in state 1 at t = 1
+		z[i, 1] <- 1
+		for (t in 2:n.occasions){
+			# state process: draw S(t) given S(t-1)
+			z[i, t] ~ dcat(ps[z[i, t-1], i, t-1, ])
+			# observation process: draw O(t) given S(t)
+			y[i, t] ~ dcat(po[z[i, t], i, t-1, ])
+		}
+	}
+
+	# calculate derived population parameters
+	for (t in 1:(n.occasions - 1)){
+		qgamma[t] <- 1 - gamma[t]
+	}
+
+	cprob[1] <- gamma[1]
+	for (t in 2:(n.occasions - 1)){
+		cprob[t] <- gamma[t] * prod(qgamma[1:(t-1)])
+	}
+
+	# inclusion probability
+	psi <- sum(cprob[])
+	for (t in 1:(n.occasions - 1)){
+		# entry probability
+		b[t] <- cprob[t] / psi
+	}
+
+	for (i in 1:M){
+		for (t in 2:n.occasions){
+			al[i, t-1] <- equals(z[i, t], 2)
+		}
+		for (t in 1:(n.occasions - 1)){
+			d[i, t] <- equals(z[i, t] - al[i, t], 0)
+		}
+		alive[i] <- sum(al[i, ])
+	}
+
+	for (t in 1:(n.occasions - 1)){
+		# actual population size	
+		N[t] <- sum(al[, t])
+		# number of entries
+		B[t] <- sum(d[, t])
+	}
+
+	for (i in 1:M){
+		w[i] <- 1 - equals(alive[i], 0)
+	}
+
+	Nsuper <- sum(w[])
+}
+
+

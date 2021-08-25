@@ -1,0 +1,21 @@
+# Closed model 1 from Kery and Schaub 2012. p. 145
+# Mt
+
+model {
+  # priors
+  Omega ~ dunif(0, 1)
+  for (i in 1:T){
+    p[i] ~ dunif(0, 1)
+  }
+
+
+  # likelihood
+  for (i in 1:M){
+    z[i] ~ dbern(Omega)
+    for (j in 1:T){
+      yaug[i, j] ~ dbern(p.eff[i,j])
+      p.eff[i, j] <- z[i] * p[j]
+    }
+  }
+  N <- sum(z[])
+}

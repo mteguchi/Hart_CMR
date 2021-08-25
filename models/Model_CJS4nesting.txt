@@ -1,0 +1,53 @@
+# Cormack-Jolly-Seber model for nesting turtles
+# Incorporates low capture probability the year after
+# a capture. 
+# Based on p.179 on Kery and Schaub
+
+model {
+  #for (i in 1:nind){
+  #  for (t in f[i]:(n.occasions-1)){
+  #    phi[i,t] <- mean.phi
+  #    #p[i,t] <- mean.p
+  #  }
+  #}
+  mean.phi ~ dunif(0,1)
+  mean.p ~ dunif(0,1)
+  beta0 ~ dnorm(0, 10)
+  beta1 ~ dnorm(0, 10)
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1   # whether or not it is alive    
+    # n is the nesting probability
+    n[i, f[i]] <- 1
+    p.eff[i,f[i]] <- z[i, f[i]] * n[i, f[i]] * mean.p
+    
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])     # whehter or not it is alive
+      mu1[i,t] <- mean.phi * z[i, t-1]
+      
+      n[i, t] ~ dbern(p.n[i,t])    # whether or not it nests
+      
+      # q.ri is the product of probability of not-nesting 
+      # (1 - p(1yr))(1 - p(2yr)) etc. 
+      # so, the probability of nesting is the product of it 
+      # and the probability of nesting p(t yr)
+      # if RI[i, t] = 1, need p.ri[1] only. 
+      
+      # or make the logit of nesting probability as a linear
+      # function of the years since last nesting. It's not a
+      # linear function but may be suffice? 
+      logit(p.n[i,t]) <- beta0 + beta1 * RI[i,t]
+      #p.n[i,t] <- ifelse(RI[i,t] == 1, p.ri[1], (p.ri[RI[i,t]] * prod((1 - p.ri[1:RI[i,t-1]]))))
+      
+      # observation process
+      y[i,t] ~ dbern(p.eff[i,t])      
+      p.eff[i, t] <- z[i, t] * n[i,t] * mean.p      
+      
+    }
+  }
+
+}
+
+

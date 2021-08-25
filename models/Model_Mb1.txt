@@ -1,0 +1,25 @@
+# Closed model 1 from Kery and Schaub 2012. p. 149
+# Mb
+
+model {
+  # priors
+  Omega ~ dunif(0, 1)
+  p ~ dunif(0, 1)
+  c ~ dunif(0, 1)
+
+  # likelihood
+  for (i in 1:M){
+    z[i] ~ dbern(Omega)
+
+    # first capture
+    yaug[i, 1] ~ dbern(p.eff[i,1])
+    p.eff[i,1] <- z[i] * p
+
+    for (j in 2:T){
+      yaug[i, j] ~ dbern(p.eff[i,j])
+      p.eff[i, j] <- z[i] * ((1 - yaug[i, (j-1)]) * p + yaug[i, (j-1)] * c)
+    }
+  }
+  N <- sum(z[])
+  trap.response <- c - p
+}

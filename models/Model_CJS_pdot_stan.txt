@@ -1,0 +1,97 @@
+// Cormack-Jolly-Seber model - p.179 on Kery and  Schaub
+// Trying to convert JAGS code into stan code, hoping this would run faster
+//
+// Tomo Eguchi
+// 2019-09-20
+
+data {
+  int<lower = 1> T;
+  int<lower = 1> n_ind;
+  int<lower = 1> n_occasions;
+  int<lower = 0> y[n_ind, n_occasions];  
+  int<lower = 1> f[n_ind];
+
+  real<lower = 0> dt[n_occasions-1];
+}
+
+parameters {
+  real <lower = 0.0> mean_p;
+  real <lower = 0.0> N[n_occasions];
+  real <lower = 0.0> mean_phi;
+
+  real<lower = 0> mu1[n_ind, n_occasions];
+  real<lower = 0> mu2[n_ind, n_occasions];
+
+}
+
+transformed parameters{
+  int<lower = 0, upper = 1> z[n_ind, n_occasions];
+
+  for (i in 1:n_ind){
+    // define latent state at first capture
+    z[i, f[i]] = 1;
+  }
+
+}
+
+model {
+
+  mean_phi ~ beta(5,2);
+  mean_p ~ beta(5,2);
+
+  // Likelihood:
+  for (i in 1:n_ind){
+    for (t in (f[i] + 1):n_occasions){
+      // state process - survival
+      z[i,t] ~ bernoulli(((mean_phi ^ dt[t]) * z[i, t-1]));
+      
+      // observation process
+      y[i,t] ~ bernoulli((mean_p * z[i,t]));
+=======
+  real mean.p;
+  real N[n_occasions];
+  real mean.phi;
+
+  int<lower = 0> z[n_ind, n_occasions];
+  int<lower = 0> mu1[n_ind, n_occasions];
+  int<lower = 0> mu2[n_ind, n_occasions];
+
+}
+
+model {
+
+  for (t in 1:T){
+      N[t] = n[t]/mean.p;
+  }
+
+  mean.phi ~ dbeta(5,2);
+  mean.p ~ dbeta(5,2);
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] = 1;
+    for (t in (f[i] + 1):n.occasions){
+      # state process - survival
+      mu1[i,t] = (mean.phi ^ dt[t]) * z[i, t-1];
+      z[i,t] ~ dbern(mu1[i,t]);
+      
+      # observation process
+      mu2[i,t] = mean.p * z[i,t];
+      y[i,t] ~ dbern(mu2[i,t]);
+>>>>>>> 968b95d0f299f733162c9395d6ee161c4a308179
+      
+    }
+  }
+
+<<<<<<< HEAD
+  for (t in 1:T){
+      N[t] = n[t]/mean_p;
+  }
+
+
+=======
+>>>>>>> 968b95d0f299f733162c9395d6ee161c4a308179
+}
+
+

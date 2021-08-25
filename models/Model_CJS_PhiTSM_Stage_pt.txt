@@ -1,0 +1,45 @@
+# Cormack-Jolly-Seber model with survival with time-since-marking 
+# and stage on survival - converted from trap response model on p.212 of Kery and 
+# Schaub
+
+model {
+
+  # gamma is a vector of length 4. They correspond to
+  # {TSM = 1/young, TSM = 1/adult, TSM = 2/young, TSM = 2/adult}
+  # m[i,t] takes one of 1, 2, 3, or 4.
+  for (i in 1:nind){
+     for (t in f[i] : (n.occasions-1)){
+        phi[i, t] <- gamma[m[i,t]]
+
+     }
+  }
+
+  for (t in 1:T){
+     p[t] ~ dbeta(5, 2) 
+     N[t] <- n[t]/p[t]
+  }
+  
+  for (u in 1:4){
+     gamma[u] ~ dbeta(5, 2)
+  }
+
+  prop.trans <- 1 - ((gamma[1] + gamma[2])/(gamma[3] + gamma[4]))
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i,t-1] ^ dt[t]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[t-1] * z[i,t]
+    }
+  }
+
+}
+
+

@@ -1,0 +1,89 @@
+# Jolly-Seber model as a superpopulation model - p.326 on Kery and 
+# Schaub
+
+model {
+
+	# priors for mean survival, mean capture, and inclusion probabilities
+	mean.phi ~ dbeta(1, 0.2)   # known high survival
+	mean.p ~ dbeta(2,2)      # capture
+
+  # they nest every ~5.5 yrs on average. beta(1,5) gives mean of 0.17
+  # which is 5.9 years and variance of 0.02.
+	psi ~ dbeta(1,5)         # inclusion - consider remigration
+  #beta1 ~ dnorm(0, 0.1)
+  #beta2 ~ dnorm(0, 0.1)
+
+	# dirichlet prior for entry probabilities
+	for (t in 1:n.occasions){
+		beta[t] ~ dgamma(1, 1)
+    #beta[t] ~ dunif(0,5)
+	}
+
+  for (t in 1:n.occasions){
+  	b[t] <- beta[t] / sum(beta[1:n.occasions])
+  }
+
+	# convert entry probabilities to conditional entry probabilities
+	nu[1] <- b[1]
+	for (t in 2:n.occasions){
+		nu[t] <- b[t] / (1 - sum(b[1:(t-1)]))
+	}
+
+	# Likelihood
+	for (i in 1:nind){
+		# first occasion
+		# state process
+		w[i] ~ dbern(psi)    # whether or not it is in the pop
+		z[i, 1] ~ dbern(nu[1])   # if it enters at t = 1
+    
+		# observation process
+		mu1[i] <- z[i, 1] * mean.p * w[i]
+		y[i, 1] ~ dbern(mu1[i])
+
+		# subsequent occasions
+		for (t in 2:n.occasions){
+			# state process: 
+			q[i, t-1] <- 1 - z[i, t-1]
+			mu2[i, t] <- mean.phi * z[i, t-1] + nu[t] * prod(q[i, 1:(t-1)])
+			z[i, t] ~ dbern(mu2[i, t])
+
+      # observation process: 
+      mu3[i, t] <- z[i, t] * mean.p * w[i]
+			y[i, t] ~ dbern(mu3[i, t])
+		}
+	}
+
+	# calculate derived population parameters
+	for (i in 1:nind){
+		for (t in 1:(n.occasions)){
+			# deflated latent state
+			u[i, t] <- z[i, t] * w[i]
+		}
+	}
+
+	for (i in 1:nind){
+		recruit[i, 1] <- u[i, 1]
+		for (t in 2:(n.occasions - 1)){
+			recruit[i, t] <- (1 - u[i, t-1]) * u[i, t]
+		}
+	}
+
+	for (t in 1:(n.occasions)){
+		# actual population size	
+		N[t] <- sum(u[1:nind, t])
+		# number of entries
+  }
+
+  for (t in 1:(n.occasions -1)){
+		B[t] <- sum(recruit[1:nind, t])
+	}
+
+	for (i in 1:nind){
+		Nind[i] <- sum(u[i, 1:n.occasions])
+		Nalive[i] <- 1 - equals(Nind[i], 0)
+	}
+	
+	# super population size
+	Nsuper <- sum(Nalive[])
+}
+

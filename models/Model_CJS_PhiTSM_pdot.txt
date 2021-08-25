@@ -1,0 +1,54 @@
+# Cormack-Jolly-Seber model with survival with time-since-marking 
+# on survival - converted from trap response model on p.212 of Kery and 
+# Schaub. Code on p. 215. There are two survival rates, which correspond
+# to the year after the first marking and the rest. 
+# The time since marking (TSM) models are described well in Chapter 7
+# of the MARK book. Starting around p. 7-40, they describe how the survival
+# rates of the first and the rest provide evidence for transients. In the
+# sidebar on p. 7-44 explains how the ratio between the two estimated
+# survival rates from a TSM model can be used to estimate the proportion of 
+# transients (or residents).  
+
+
+model {
+
+  for (i in 1:nind){
+     for (t in f[i] : (n.occasions-1)){
+        phi[i, t] <- gamma[m[i,t]]
+
+     }
+  }
+
+  for (t in 1:T){
+     p[t] ~ dbeta(5, 2) 
+     N[t] <- n[t]/p[t]
+  }
+  
+  for (u in 1:2){
+     gamma[u] ~ dbeta(5, 2)
+  }
+
+  mean.p ~ dbeta(5, 2) #unif(0,1)
+  
+  prop.trans <- 1 - (gamma[1]/gamma[2])
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i,t-1] ^ dt[t]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- mean.p * z[i,t]
+      
+      loglik[i,t] <- logdensity.bern(y[i,t], mu2[i,t])
+    }
+  }
+
+}
+
+

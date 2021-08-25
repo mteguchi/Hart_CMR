@@ -1,0 +1,48 @@
+# Cormack-Jolly-Seber random effects model - p.197 on Kery and 
+# Schaub
+
+model {
+  for (i in 1:nind){
+    for (t in f[i]:(n.occasions-1)){
+      logit(phi[i,t]) <- mu + epsilon[i]      
+      logit(p[i,t]) <- muP + epsilonP[t]
+    }
+  }
+
+  for (i in 1:nind){
+    epsilon[i] ~ dnorm(0, tau)
+  }
+
+  for (t in 1:(n.occasions-1)){
+    epsilonP[t] ~ dnorm(0, tauP)
+  }
+
+  mean.phi ~ dunif(0,1)
+  mu <- log(mean.phi / (1 - mean.phi))
+  sigma ~ dunif(0, 5)
+  tau <- pow(sigma, -2)
+  sigma2 <- 1/tau
+  
+  mean.p ~ dunif(0,1)
+  muP <- log(mean.p / (1 - mean.p))
+  sigmaP ~ dunif(0, 2)
+  tauP <- pow(sigmaP, -2)
+  sigma2P <- 1/tauP
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- phi[i, t-1] * z[i, t-1]
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[i, t-1] * z[i,t]
+    }
+  }
+
+}
+
+

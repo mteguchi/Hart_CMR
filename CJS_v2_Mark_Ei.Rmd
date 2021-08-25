@@ -1,0 +1,365 @@
+---
+title: "Capture recapture analyses for Agnese Mancini"
+output: html_notebook
+---
+
+This document describes data analysis of Agnese Mancini's data of green turtle capture recapture events. 
+
+
+Initialize the workspace
+```{r}
+rm(list=ls())
+library(jagsUI)
+library(tidyverse)
+library(lubridate)
+library(reshape)
+library(bayesplot)
+library(ggridges)
+library(RMark)
+library(R2ucare)
+
+source("Mancini_functions.R")
+
+do_analysis <- function(dp, ddl)
+{
+  # create formulas for Phi
+  # tsm is time-since-marking; check for transient effects
+  Phi.dot <-  list(formula = ~ 1)  
+  #Phi.weight <- list(formula= ~ min_weight)   # many missing data 
+  #Phi.t <- list(formula = ~ time)             # we never have this model worked for turtles... 
+  #Phi.season <- list(formula = ~ sum_win)      # this also is unlikely... 
+  #Phi.transience <- list(formula = ~ Transient)
+  Phi.tsm <- list(formula = ~ tsm)
+  
+  #create formulas for p
+  p.dot <- list(formula = ~ 1)
+  p.t <- list(formula = ~ time)
+  p.tsm <- list(formula = ~ tsm)
+  #p.transience <- list(formula = ~ Transient)
+  #p.tsm.transience <- list(formula = ~ tsm + Transient)
+  #p.t.transience <- list(formula = ~ time + Transient)
+  p.effort <- list(formula = ~ effort)
+  p.season <- list(formula = ~ sum_win)
+  p.tsm.season <- list(formula = ~ tsm + sum_win)
+  p.tsm.effort <- list(formula = ~ tsm + effort)
+  
+  # create all combinations 
+  cml <- create.model.list("CJS")
+  
+  # run all all models and return as a list with class marklist
+  results <- mark.wrapper(model.list = cml,
+                          #type = "CJS",   # UNNECESSARY LINE.
+                          data = dp,
+                          ddl = ddl,
+                          output = FALSE,
+                          silent = TRUE)
+  return(results)
+}
+
+```
+
+Bring in the data file and get ready for CJS
+
+```{r warning=F}
+#dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
+dat.1 <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE_v2.csv")
+
+dat.1 %>% filter(species == "Cm") -> dat.1.Cm
+
+CJS.data <- dat2CJS(dat.1.Cm, save.file = FALSE)
+
+CJS.data$data %>% rownames_to_column(var = "ID") -> CH.1 #data.CJS
+
+# using R2ucare::group_data to combine CHs
+CH.2 <- R2ucare::group_data(CJS.data$data, rep(1, nrow(CJS.data$data)))
+
+# remove weight because not all turtles were weighed...
+# dat.1.Cm %>% select(ID, weight_kg) %>% group_by(ID) %>%
+#   summarise(min_weight = min(weight_kg, na.rm = T)) %>%
+#   filter(!is.infinite(min_weight)) -> data.weight
+# 
+# data.weight  %>% left_join(data.CJS, by = "ID") %>%
+#   select(-c("ID", "min_weight")) -> CH.1
+# 
+# data.weight  %>% left_join(data.CJS, by = "ID") %>%
+#   select(min_weight) -> cov.weight
+
+# here I define transients to be those that were caught just once
+# but that eliminates the possibility of dying after the first
+# capture - how do I deal with this?
+# n.cap <- rowSums(CJS.data$data)
+# transient.vec <- rep(1, times = length(n.cap))
+# transient.vec[n.cap > 1] <- 2
+
+# need to count how many capture events occured per season
+dat.1.Cm %>% select(season, "DATE") %>% 
+  group_by(season) %>% #-> tmp3
+  summarise(effort = n_distinct(DATE)) -> effort.season
+
+# capture history
+tmp <- apply(as.matrix(CH.2[, 1:(ncol(CH.2)-1)]), 
+             MARGIN = 2,
+             FUN = paste0)
+
+CH <- unite(data.frame(tmp),
+           col = "ch",
+           sep = "")
+
+CH$freq <- CH.2$effY
+
+# tmp <- apply(as.matrix(CJS.data$data), 
+#              MARGIN = 2, 
+#              FUN = paste0)
+
+# CH <- unite(data.frame(tmp), 
+#             col = "ch", 
+#             sep = "")
+
+#CH$min_weight <- cov.weight
+#CH$Transient <- transient.vec
+
+
+# capture dates and difference in years
+cap.dates <- paste0(colnames(CJS.data$data), "-01")
+delta.dates <- signif(as.numeric(as.Date(cap.dates[2:length(cap.dates)]) -
+                                   as.Date(cap.dates[1:(length(cap.dates)-1)]))/365, 1)
+
+# a possibility of survival changing between summer/winter?
+tmp <- strsplit(colnames(CJS.data$data), split = "-")
+tmp2 <- lapply(tmp, FUN = function(x) x[2])
+tmp3 <- unlist(tmp2)
+
+# dp <- process.data(CH, 
+#                    model = "CJS", 
+#                    time.intervals = delta.dates,
+#                    groups = "Transient",
+#                    begin.time = 2001)
+
+dp <- process.data(CH, 
+                   model = "CJS", 
+                   time.intervals = delta.dates,
+                   begin.time = 2001)
+
+ddl <- make.design.data(dp)
+
+# p is indexed from 2001.4
+# Phi is indexed from 2001
+
+# effort affects the capture probability (p)
+effort.season <- effort.season[1:length(levels(ddl$p$time)),]
+effort.season$time <- as.factor(2001 + cumsum(delta.dates))
+
+ddl$p <- merge_design.covariates(ddl$p, df = effort.season)
+
+# summer/winter affects capture probability (maybe)
+sum_win <- data.frame(sum_win = unlist(ifelse(tmp3 == "08", "summer", "winter")) [1:length(levels(ddl$p$time))],
+                      time = as.factor(2001 + cumsum(delta.dates)))
+
+ddl$p <- merge_design.covariates(ddl$p, df = sum_win)
+
+# summer/winter affects survival (maybe)
+sum_win <- data.frame(sum_win = unlist(ifelse(tmp3 == "08", "summer", "winter")) [1:length(levels(ddl$p$time))],
+                      time = as.factor(2001 + cumsum(c(0, delta.dates[1:(length(delta.dates)-1)]))))
+
+ddl$Phi <- merge_design.covariates(ddl$Phi, df = sum_win)
+
+# add time-since-marking (TSM models) - not sure if I'm doing this right... 
+# When age = 0, it is the first time turtles were caught group(1)
+# all others are group(2), which are recaptures. 
+ddl$Phi$tsm <- 1
+ddl$Phi$tsm[ddl$Phi$age != 0] <- 2  # it used to be == 0. Doesn't look right
+
+ddl$p$tsm <- 1
+ddl$p$tsm[ddl$p$age != 0] <- 2    # it used to be == 0. Doesn't look right
+
+cm.results <- do_analysis(dp = dp, ddl = ddl)
+
+```
+
+Compare results using AICc:
+
+```{r}
+model.table(cm.results)
+```
+
+To look at the output (if I haven't deleted the output), use cm.results\$Phi.tsm.p.t\$output to find which output file markXXX contains the results. 
+
+According to AICc, the best one is Phi(tsm)p(time). But c-hat > 5!  This is better than before but, obviously, this isn't a great model... What to do? 
+
+Look at the estimates:
+```{r}
+cm.results$Phi.tsm.p.t$results$real
+```
+
+Export to Mark to see Release GOF.
+```{r}
+export.MARK(dp, 
+            project.name = "Mancini_Cm", 
+            model = cm.results$Phi.tsm.p.t, 
+            replace = T, 
+            chat = 5.35)    # from the output file (mark022.out). 
+```
+
+THIS HAS NOT BEEN COMPLETED - CAN'T DO THIS IN LINUX:
+Median c-hat test returned semi-acceptable results of estimated c-hat = 1.xxx, with 95%CI = ().  
+
+
+Release output is similar to what I find below from R2ucare.
+
+
+R2ucare to do GOF.  There is no GOF for individual covariate models so we need to remove them before checking GOF (from user guide for R2ucare).
+
+```{r}
+
+#CH.ucare <- select(CH, -c("min_weight", "Transient"))
+
+# test away! 
+test3sr_Cm <- test3sr(as.matrix(CH.2[, 1:(ncol(CH.2)-1)]), CH.2$effY)
+test3sm_Cm <- test3sm(as.matrix(CH.2[, 1:(ncol(CH.2)-1)]), CH.2$effY)
+
+test2ct_Cm <- test2ct(as.matrix(CH.2[, 1:(ncol(CH.2)-1)]), CH.2$effY)
+test2cl_Cm <- test2cl(as.matrix(CH.2[, 1:(ncol(CH.2)-1)]), CH.2$effY)
+
+# look at the overall results
+test_all_Cm <- overall_CJS(as.matrix(CH.2[, 1:(ncol(CH.2)-1)]), CH.2$effY)
+
+# using Justin's equations from Howick's data:
+# stat_new <- overall_CJS(as.matrix(CJS.data$data), 
+#                         rep(1, nrow(CJS.data$data)))$chi2 - 
+#   (test3sr(as.matrix(CJS.data$data), 
+#            rep(1, nrow(CJS.data$data)))$test3sr[[1]])
+# df_new <- overall_CJS(as.matrix(CJS.data$data), 
+#                       rep(1, nrow(CJS.data$data)))$degree_of_freedom - 
+#   (test3sr(as.matrix(CJS.data$data), rep(1, nrow(CJS.data$data)))$test3sr[[2]])
+# 
+# 1-pchisq(stat_new, df_new)
+
+```
+
+Look at one at a time:
+```{r}
+test3sr.details <- test3sr_Cm$details
+
+filter(test3sr.details, p_val < 0.05)
+```
+
+Occasions 3, 14, 23, 25, 26, 30, 31, and 35 were "rejected" at alpha = 0.05.  If we lower the alpha value to be 0.01, only one (3) was problematic.  Still, the entire test was rejected.  TEST3.SR asks "of those individuals seen either on or before occasion (i), what proportion were ever seen again?" According to the Book (Mark Book), it states that "If TEST3.SR is rejected, then this suggests that there is a difference in 'survival' among individuals, depending on whether or not they were seen for the first time either on or before occasion (i)." We probalby had more (I'm assuming this from signed_test values...) seen after these occasions than expected.  Could this mean that these seasons included individuals that were "more" residents than from other seasons? 
+
+TEST3.SM, on the other hand, looks at individuals who were seen again.  "Among these individuals seen again, when they were seen again does not depend on whether or not they were seen for the first time at occasion (i). So, let's take a look at that result.
+
+```{r}
+test3sm.details <- test3sm_Cm$details
+filter(test3sm.details, p_val < 0.05)
+```
+
+There are 4 occasions that violated the assumptions; 4, 7, 15, and 37.  The 7th and 37th occasions seem to have weird output with no statistics computed for them.  Why would df = 0?  
+
+To make a comparison, I look at an occasion that passed the test:
+
+```{r}
+# first filter rows with 1s on the 25th column
+data.25 <- filter(CJS.data$data, CJS.data$data[, 25] > 0) #%>%
+# then look at recaptures since the 25th occasion
+data.25 <- data.25[, 25:ncol(data.25)]
+
+# look at the recaptures, given they were caught on the 25th occasion. 
+data.25.3sm <- data.25[, c(2:ncol(data.25))]
+rowSums(data.25.3sm)
+```
+
+Then look at what happened in those occasions (4, 7, 36). 
+
+```{r}
+# first filter rows with 1s on the 4th column
+data.4 <- filter(CJS.data$data, CJS.data$data[, 4] > 0) #%>%
+# then look at recaptures since the 4th occasion
+data.4 <- data.4[, 4:ncol(data.4)]
+
+# look at the recaptures, given they were caught on the 4th occasion. 
+data.4.3sm <- data.4[, c(2:ncol(data.4))]
+rowSums(data.4.3sm)
+
+```
+
+I see that there are some recaptures that are unusually high - a 5 and 3.  This is probably why this occasion was flagged. 
+
+```{r}
+# first filter rows with 1s on the 7th column
+data.7 <- filter(CJS.data$data, CJS.data$data[, 7] > 0) #%>%
+# then look at recaptures since the 7th occasion
+data.7 <- data.7[, 7:ncol(data.7)]
+
+# look at the recaptures, given they were caught on the 7th occasion. 
+data.7.3sm <- data.7[, c(2:ncol(data.7))]
+rowSums(data.7.3sm)
+
+```
+
+Seems awfuly a small number of captures at the 7th occasion. Of these, only 3 were recaptured more than once after it was released on the 7th occasion. It still doesn't make much sense... 
+
+```{r}
+# 
+data.36 <- filter(CJS.data$data, CJS.data$data[, 36] > 0) #%>%
+#  select(-"ID") 
+
+# then look at recaptures since the 7th occasion
+data.36 <- data.36[, 36:ncol(data.36)]
+
+# this is the second to last occasion.  
+data.36.3sm <- data.36[, c(2:ncol(data.36))]
+data.36.3sm
+
+# n.caps.36.sm <- rowSums(data.36.3sm)
+sum(data.36.3sm)
+#rowSums(data.36.3sm)
+
+```
+
+Of 429 turtles caught on the 36th occasion, 11 were caught again on the 37th (final) occasion.  These are for January and August of 2019.  Not sure why df = 0 in these two occasions. 
+
+So, what do we do with these results...?
+
+
+Moving on to TEST2... TEST2.CT tests the hypothesis that "there is no difference in the probability of being recaptured at t+1 between those captured and not captured at occasion t, conditional on presence at both occasions.  
+
+```{r}
+test2ct_Cm.details <- test2ct_Cm$details
+filter(test2ct_Cm.details, p_val < 0.05)
+```
+
+There were four occasions when the test failed at alpha = 0.05; one (22) was positive and three were negative (4, 16, and 32). With alpha = 0.01, only one (16) was rejected. 
+
+TEST2.CL tests if there is no difference in the expected time of next capture between the individuals captured and not captured at occasion t conditional on presence at both occasions t adn t + 2.  
+
+```{r}
+test2cl_Cm.details <- test2cl_Cm$details
+filter(test2cl_Cm.details, p_val < 0.05)
+```
+
+There were six occasions that were flagged (alpha = 0.05), which were all positive.  Occasions 16 and 22 failed the 2ct and 2cl tests. With alpha = 0.01, two are "significant": occasions 14 and 34. 
+
+
+```{r}
+test_all_Cm
+```
+
+These tests failed at some occasions. Does this mean the entire model is not suited to the data, or there are some occasions that failed the test but the CJS model isn't a complete failure because given the null-hypothesis approach, some tests are bound to fail when there are many occasions?  I see a good sign that many occasions passed these tests... The main concern right now is the estimated c-hat value of > 9.  
+
+How do we deal with that? 
+
+It's possible that using the other criteria, such as median c-hat and other GOF measures, we may be able to get away with using the CJS model. Assuming, that can be done... look at abundance. Do I have to separate residents from transients (only seen just once)?
+
+The estimated proportion of residents can be computed from the two survival rates:
+```{r}
+real.estimates <- cm.results$Phi.tsm.p.t$results$real %>% rownames_to_column("parameter")
+
+p.residents <- real.estimates$estimate[1]/real.estimates$estimate[2]
+  
+phats <- real.estimates$estimate[grep("p", real.estimates$parameter)]
+n.caught <- colSums(CJS.data$data)
+Nhats <- (n.caught[2:length(n.caught)]/phats) * p.residents
+```
+
+These seem so high! Are there that many green turtles in the area? 
+
+

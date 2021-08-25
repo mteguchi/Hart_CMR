@@ -1,0 +1,74 @@
+# Cormack-Jolly-Seber model with survival with time-since-marking 
+# on survival - converted from trap response model on p.212 of Kery and 
+# Schaub. Code on p. 215. There are two survival rates, which correspond
+# to the year after the first marking and the rest. 
+# The time since marking (TSM) models are described well in Chapter 7
+# of the MARK book. Starting around p. 7-40, they describe how the survival
+# rates of the first and the rest provide evidence for transients. In the
+# sidebar on p. 7-44 explains how the ratio between the two estimated
+# survival rates from a TSM model can be used to estimate the proportion of 
+# transients (or residents).  
+
+# In this version, I attempt to add the logistic population model to it... 2020-08-28
+
+model {
+
+  # This section attempts to get the logistic model into the 
+  # overall model. The Horvitz-Thompson estimator is replaced
+  # with binomial likelhood. The state space of N (mu_N) is 
+  # modeled with the logistic function, whereas N is treated
+  # as a normal deviate 
+
+  # The initial state needs to be defined. 
+  p[1] ~ dbeta(5, 2)
+  n[1] ~ dpois(p[1] * N[1])
+  #N[1] ~ dnorm(mu_N[1], tau_N) T(0,)
+  N[1] ~ dnorm(0, 0.00001) T(0,) 
+
+  r ~ dnorm(0, 0.1)
+  K ~ dnorm(mean.K, 0.00001) T(0,)
+
+  for (t in 2:T){
+     p[t] ~ dbeta(5, 2) 
+     n[t] ~ dpois(p[t] * N[t])
+     #N[t] ~ dnorm(mu_N[t], tau_N) T(0,)
+     N[t] <- N[t-1] + r * N[t-1] * (1 - N[t-1]/K)  
+  }
+  
+  tau_N ~ dgamma(0.1, 5)
+  sigma_N <- sqrt(1/tau_N)
+
+  # Time since marking effects on survival
+  for (i in 1:nind){
+     for (t in f[i] : (n.occasions-1)){
+        phi[i, t] <- gamma[m[i,t]]
+
+     }
+  }
+
+  for (u in 1:2){
+     gamma[u] ~ dbeta(5, 2)
+  }
+
+  prop.trans <- 1 - (gamma[1]/gamma[2])
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i,t-1] ^ dt[t]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[t-1] * z[i,t]
+      
+      loglik[i,t] <- logdensity.bern(y[i,t], mu2[i,t])
+    }
+  }
+
+}
+
+

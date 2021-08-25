@@ -1,0 +1,38 @@
+# Cormack-Jolly-Seber model with trap response - p.212- on Kery and 
+# Schaub Code is on p. 215. The way survival is incorporated into
+# the likelihood has been modified from the original version. 
+# in the book, it is in the first loop along with p[i,t]:
+# phi[i,t] <- mean.phi.  This seems redundant so I changed 
+# it to have just mean.phi in the state process. 
+
+model {
+  for (i in 1:nind){
+     for (t in f[i] : (n.occasions-1)){
+        p[i, t] <- beta[m[i,t]] 
+     }
+  }
+
+  mean.phi ~ dbeta(5, 2) #dunif(0,1)
+  for (u in 1:2){
+     beta[u] ~ dunif(0, 1)
+  }
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (mean.phi ^ dt[t]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[i, t-1] * z[i,t]
+      loglik[i,t] <- logdensity(y[i,t], mu2[i,t])
+    }
+  }
+
+}
+
+

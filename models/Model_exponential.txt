@@ -1,0 +1,24 @@
+# Model_exponential.txt
+# Exponential model
+# Provide N vector, time vector, length_t, mu_N1
+
+model{
+	
+	N[1] ~ dnorm(mu_N[1], 1/var_N)
+	mu_N[1] ~ dnorm(mu_N1, 0.01)I(0,)
+	loglik[1] <- logdensity.norm(N[1], mu_N[1], 1/var_N)
+
+	for (t in 2:length_t){
+
+		N[t] ~ dnorm(mu_N[t], 1/var_N)
+
+		mu_N[t] <- mu_N[1] * exp(r * time[t])
+		loglik[t] <- logdensity.norm(N[t], mu_N[t], 1/var_N)
+
+	}
+
+	r ~ dnorm(0, 0.01)
+	var_N ~ dgamma(5, 0.1)
+	sd_N <- sqrt(var_N)
+
+}

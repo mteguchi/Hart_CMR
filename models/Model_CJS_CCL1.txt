@@ -1,0 +1,41 @@
+# Cormack-Jolly-Seber model - p.199 on Kery and 
+# Schaub, with initial size as a covariate on survival
+
+model {
+  for (i in 1:nind){
+    for (t in f[i]:(n.occasions-1)){
+      logit(phi[i,t]) <- mu + beta * x[i] + epsilon[i]
+      p[i,t] <- mean.p
+    }
+  }
+
+  for (i in 1:nind){
+    epsilon[i] ~ dnorm(0, tau)
+  }
+
+  mean.phi ~ dunif(0,1)
+  mu <- log(mean.phi / (1 - mean.phi))
+  beta ~ dnorm(0, 0.01)
+  sigma ~ dgamma(3, 1)
+  tau <- pow(sigma, -2)
+  sigma2 <- pow(sigma, 2)
+  mean.p ~ dunif(0,1)
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- phi[i, t-1] * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[i, t-1] * z[i,t]  
+    }
+  }
+
+}
+
+

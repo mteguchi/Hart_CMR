@@ -1,0 +1,45 @@
+# Cormack-Jolly-Seber model - p.179 on Kery and 
+# Schaub
+
+model {
+  for (i in 1:nind){
+    phi[i] <- mean.phi
+  }
+
+  for (t in 1:T){
+  	# when the covariate (# sampling days per season) is centered,
+  	# the intercept is needed
+    logit(p[t]) <- beta0 + beta1 * x[t] + epsilon[t] 
+    epsilon[t] ~ dnorm(0, tau.p)
+
+    #p[t] ~ dbeta(alpha.p, beta.p)  #<- mean.p
+    N[t] <- n[t]/p[t]
+  }
+
+  alpha.p <- 2
+  beta.p <- 2
+
+  mean.phi ~ dunif(0,1)
+  #mean.p ~ dunif(0,1)
+  tau.p ~ dgamma(2, 0.1)
+  beta0 ~ dnorm(0, 0.1)
+  beta1 ~ dnorm(0, 0.1)
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i] ^ dt[t-1]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[t] * z[i,t]
+    }
+  }
+
+}
+
+

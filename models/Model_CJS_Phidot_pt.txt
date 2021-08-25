@@ -1,0 +1,36 @@
+# Cormack-Jolly-Seber model - p.179 on Kery and 
+# Schaub
+
+model {
+  for (i in 1:nind){
+    phi[i] <- mean.phi
+  }
+
+  for (t in 1:T){
+      p[t] ~ dbeta(5, 2)  #<- mean.p
+      N[t] <- n[t]/p[t]
+  }
+
+  mean.phi ~ dbeta(5, 2) #dunif(0,1)
+  #mean.p ~ dbeta(5, 2) #dunif(0,1)
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i] ^ dt[t]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[t-1] * z[i,t]
+      
+      loglik[i,t] <- logdensity.bern(y[i,t], mu2[i,t])
+    }
+  }
+
+}
+
+

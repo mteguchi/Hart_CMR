@@ -1,0 +1,55 @@
+# Cormack-Jolly-Seber model - p.179 on Kery and 
+# Schaub
+# modified for Ingram Island data - capture probabilities as a function 
+# of a covariate (the number of sampling days) and survival probabilities as a 
+# function of another covariate (the minimum recorded CCL of each individual),
+# where the effects are modeled as logit linear. 
+
+model {
+  for (i in 1:nind){
+     # I centered the covariate (the observed minimum CCL)
+     logit(phi[i]) <- mu.phi + beta1.phi * x.phi[i] + epsilon.phi[i]
+     epsilon.phi[i] ~ dnorm(0, tau.phi)
+  }
+
+  for (t in 1:T){
+  	# when the covariate (# sampling days per season) is centered,
+  	# the intercept is needed
+    logit(p[t]) <- beta0.p + beta1.p * x.p[t] + epsilon.p[t] 
+    epsilon.p[t] ~ dnorm(0, tau.p)
+
+    # abundance is computed through Horowitz-Thompson estimator
+    N[t] <- n[t]/p[t]
+  }
+
+  alpha.p <- 2
+  beta.p <- 2
+
+  mean.phi ~ dunif(0,1)
+  mu.phi <- log(mean.phi / (1 - mean.phi))
+  beta1.phi ~ dnorm(0, 0.01)
+  #mean.p ~ dunif(0,1)
+  tau.p ~ dgamma(2, 0.1)
+  tau.phi ~ dgamma(2, 0.1)
+
+  beta0.p ~ dnorm(0, 0.1)
+  beta1.p ~ dnorm(0, 0.1)
+
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i] ^ dt[t-1]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[t] * z[i,t]
+    }
+  }
+
+}
+
+

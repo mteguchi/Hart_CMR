@@ -1,0 +1,24 @@
+# Model_linear.txt
+# linear model
+# Provide log(N) vector, time vector, length_t, log(mu_N1)
+
+model{
+	
+	logN[1] ~ dnorm(mu_N[1], 1/var_N)
+	mu_N[1] ~ dnorm(log_mu_N1, 0.01)I(0,)
+	loglik[1] <- logdensity.norm(logN[1], mu_N[1], 1/var_N)
+
+	for (t in 2:length_t){
+
+		logN[t] ~ dnorm(mu_N[t], 1/var_N)
+
+		mu_N[t] <- mu_N[1] + r * time[t]
+		loglik[t] <- logdensity.norm(logN[t], mu_N[t], 1/var_N)
+
+	}
+
+	r ~ dnorm(0, 0.01)
+	var_N ~ dgamma(5, 0.1)
+	sd_N <- sqrt(var_N)
+
+}

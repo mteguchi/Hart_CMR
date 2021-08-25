@@ -1,0 +1,103 @@
+# Jolly-Seber model as a superpopulation model with 
+# individual random effects - p.336 on Kery and 
+# Schaub
+
+model {
+
+	# priors and conatraints
+	for (i in 1:M){
+		for (t in 1:(n.occasions - 1)){
+			phi[i, t] <- mean.phi
+		}
+		# prior for entry probability
+		for (t in 1:n.occasions){
+			logit(p[i, t]) <- mean.lp + epsilon[i]
+		}
+	}
+
+	# priors for mean survival, mean capture, and inclusion probabilities
+	mean.phi ~ dunif(0, 1)
+  mean.lp <- log(mean.p / (1 - mean.p))
+	mean.p ~ dunif(0, 1)
+
+  # In JAGS, I(L,U) is not allowed when the distribution is not fixed
+  # Need to use T(L,U) instead. This however, is normalized to the 
+  # space {L, U}, which requires more computations rather than a simple
+  # truncation. Probably better to use an inverse-gamma distribution on
+  # tau with a relatively informative space.
+  for (i in 1:M){
+    epsilon[i] ~ dnorm(0, tau)   # I(-10,10)
+  }
+  tau <- pow(sigma, -2)
+  sigma ~ dunif(0, 3)  # changed from (0,5) to get rid of I(-10,10) in K&S
+  sigma2 <- pow(sigma, 2)
+  
+	psi ~ dunif(0, 1)
+
+	# dirichlet prior for entr probabilities
+	for (t in 1:n.occasions){
+		beta[t] ~ dgamma(1, 1)
+		b[t] <- beta[t] / sum(beta[1:n.occasions])
+	}
+
+	# convert entry probabilities to conditional entry probabilities
+	nu[1] <- b[1]
+	for (t in 2:n.occasions){
+		nu[t] <- b[t] / (1 - sum(b[1:(t-1)]))
+	}
+
+	# Likelihood
+	for (i in 1:M){
+		# first occasion
+		# state process
+		w[i] ~ dbern(psi)
+		z[i, 1] ~ dbern(nu[1])
+
+		# observation process
+		mu1[i] <- z[i, 1] * p[i, 1] * w[i]
+		y[i, 1] ~ dbern(mu1[i])
+
+		# subsequent occasions
+		for (t in 2:n.occasions){
+			# state process: 
+			q[i, t-1] <- 1 - z[i, t-1]
+			mu2[i, t] <- phi[i, t-1] * z[i, t-1] + nu[t] * prod(q[i, 1:(t-1)])
+			z[i, t] ~ dbern(mu2[i, t])
+			# observation process: 
+      mu3[i, t] <- z[i,t] * p[i,t] * w[i]
+			y[i, t] ~ dbern(mu3[i, t])
+		}
+	}
+
+	# calculate derived population parameters
+	for (i in 1:M){
+		for (t in 1:(n.occasions)){
+			# deflated latent state
+			u[i, t] <- z[i, t] * w[i]
+		}
+	}
+
+	for (i in 1:M){
+		recruit[i, 1] <- u[i, 1]
+		for (t in 2:n.occasions){
+			recruit[i, t] <- (1 - u[i, t-1]) * u[i, t]
+		}
+	}
+
+	for (t in 1:n.occasions){
+		# actual population size	
+		N[t] <- sum(u[1:M, t])
+		# number of entries
+		B[t] <- sum(recruit[1:M, t])
+	}
+
+	for (i in 1:M){
+		Nind[i] <- sum(u[i, 1:n.occasions])
+		Nalive[i] <- 1 - equals(Nind[i], 0)
+	}
+	
+	# super population size
+	Nsuper <- sum(Nalive[])
+}
+
+

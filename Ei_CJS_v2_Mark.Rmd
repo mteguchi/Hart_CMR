@@ -1,0 +1,219 @@
+---
+title: "Capture recapture analyses for Agnese Mancini"
+output: html_notebook
+---
+
+This document describes data analysis of Agnese Mancini's data of green turtle capture recapture events. 
+
+
+Initialize the workspace
+```{r}
+rm(list=ls())
+library(jagsUI)
+library(tidyverse)
+library(lubridate)
+library(reshape)
+library(bayesplot)
+library(ggridges)
+library(RMark)
+library(R2ucare)
+
+source("Mancini_functions.R")
+
+do_analysis <- function(dp, ddl)
+{
+  # create formulas for Phi
+  # tsm is time-since-marking; check for transient effects
+  Phi.dot <-  list(formula = ~ 1)  
+  #Phi.weight <- list(formula= ~ min_weight)   # many missing data 
+  #Phi.t <- list(formula = ~ time)             # we never have this model worked for turtles... 
+  #Phi.season <- list(formula = ~ sum_win)      # this also is unlikely... 
+  #Phi.transience <- list(formula = ~ Transient)
+  Phi.tsm <- list(formula = ~ tsm)
+  
+  #create formulas for p
+  p.dot <- list(formula = ~ 1)
+  p.t <- list(formula = ~ time)
+  p.tsm <- list(formula = ~ tsm)
+  #p.transience <- list(formula = ~ Transient)
+  #p.tsm.transience <- list(formula = ~ tsm + Transient)
+  #p.t.transience <- list(formula = ~ time + Transient)
+  p.effort <- list(formula = ~ effort)
+  p.season <- list(formula = ~ sum_win)
+  p.tsm.season <- list(formula = ~ tsm + sum_win)
+  p.tsm.effort <- list(formula = ~ tsm + effort)
+  
+  # create all combinations 
+  cml <- create.model.list("CJS")
+  
+  # run all all models and return as a list with class marklist
+  results <- mark.wrapper(cml,
+                          data=dp,
+                          ddl=ddl,
+                          output=FALSE,
+                          silent=TRUE)
+  return(results)
+}
+
+```
+
+Bring in the data file and get ready for CJS
+
+```{r warning=F}
+#dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
+
+dat.1.Cm <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE_v2.csv")
+
+# there are In in the species code... 
+#dat.1 %>% filter(species == "Cm") -> dat.1.Cm
+
+CJS.data <- dat2CJS(dat.1.Cm, save.file = FALSE)
+
+CJS.data$data %>% rownames_to_column(var = "ID") -> CH.1 #data.CJS
+
+# using R2ucare::group_data to combine CHs
+CH.2 <- R2ucare::group_data(CJS.data$data, rep(1, nrow(CJS.data$data)))
+
+# remove weight because not all turtles were weighed...
+# dat.1.Cm %>% select(ID, weight_kg) %>% group_by(ID) %>%
+#   summarise(min_weight = min(weight_kg, na.rm = T)) %>%
+#   filter(!is.infinite(min_weight)) -> data.weight
+# 
+# data.weight  %>% left_join(data.CJS, by = "ID") %>%
+#   select(-c("ID", "min_weight")) -> CH.1
+# 
+# data.weight  %>% left_join(data.CJS, by = "ID") %>%
+#   select(min_weight) -> cov.weight
+
+# here I define transients to be those that were caught just once
+# but that eliminates the possibility of dying after the first
+# capture - how do I deal with this?
+# n.cap <- rowSums(CJS.data$data)
+# transient.vec <- rep(1, times = length(n.cap))
+# transient.vec[n.cap > 1] <- 2
+
+# need to count how many capture events occurred per season
+dat.1.Cm %>% select(season, "DATE") %>% 
+  group_by(season) %>% #-> tmp3
+  summarise(effort = n_distinct(DATE)) -> effort.season
+
+# capture history
+tmp <- apply(as.matrix(CH.2[, 1:(ncol(CH.2)-1)]), 
+             MARGIN = 2,
+             FUN = paste0)
+
+CH <- unite(data.frame(tmp),
+           col = "ch",
+           sep = "")
+
+CH$freq <- CH.2$effY
+
+# tmp <- apply(as.matrix(CJS.data$data), 
+#              MARGIN = 2, 
+#              FUN = paste0)
+
+# CH <- unite(data.frame(tmp), 
+#             col = "ch", 
+#             sep = "")
+
+#CH$min_weight <- cov.weight
+#CH$Transient <- transient.vec
+
+
+# capture dates and difference in years
+cap.dates <- paste0(colnames(CJS.data$data), "-01")
+delta.dates <- signif(as.numeric(as.Date(cap.dates[2:length(cap.dates)]) -
+                                   as.Date(cap.dates[1:(length(cap.dates)-1)]))/365, 1)
+
+# a possibility of survival changing between summer/winter?
+tmp <- strsplit(colnames(CJS.data$data), split = "-")
+tmp2 <- lapply(tmp, FUN = function(x) x[2])
+tmp3 <- unlist(tmp2)
+
+# dp <- process.data(CH, 
+#                    model = "CJS", 
+#                    time.intervals = delta.dates,
+#                    groups = "Transient",
+#                    begin.time = 2001)
+
+dp <- process.data(CH, 
+                   model = "CJS", 
+                   time.intervals = delta.dates,
+                   begin.time = 2001)
+
+ddl <- make.design.data(dp)
+
+# p is indexed from 2001.4
+# Phi is indexed from 2001
+
+# effort affects the capture probability (p)
+effort.season <- effort.season[1:length(levels(ddl$p$time)),]
+effort.season$time <- as.factor(2001 + cumsum(delta.dates))
+
+ddl$p <- merge_design.covariates(ddl$p, df = effort.season)
+
+# summer/winter affects capture probability (maybe)
+sum_win <- data.frame(sum_win = unlist(ifelse(tmp3 == "08", "summer", "winter")) [1:length(levels(ddl$p$time))],
+                      time = as.factor(2001 + cumsum(delta.dates)))
+
+ddl$p <- merge_design.covariates(ddl$p, df = sum_win)
+
+# summer/winter affects survival (maybe)
+sum_win <- data.frame(sum_win = unlist(ifelse(tmp3 == "08", "summer", "winter")) [1:length(levels(ddl$p$time))],
+                      time = as.factor(2001 + cumsum(c(0, delta.dates[1:(length(delta.dates)-1)]))))
+
+ddl$Phi <- merge_design.covariates(ddl$Phi, df = sum_win)
+
+# add time-since-marking (TSM models) - not sure if I'm doing this right... 
+# When age = 0, it is the first time turtles were caught group(1)
+# all others are group(2), which are recaptures. 
+ddl$Phi$tsm <- 1
+ddl$Phi$tsm[ddl$Phi$age == 0] <- 2
+
+ddl$p$tsm <- 1
+ddl$p$tsm[ddl$p$age == 0] <- 2
+
+Cm.results <- do_analysis(dp = dp, ddl = ddl)
+
+Cm.CJS.input <- list(raw.data = dat.1.Cm,
+                     CJS.data = CJS.data,
+                     CH.1 = CH.1,
+                     CH.R2ucare = CH.2,
+                     effort = effort.season,
+                     CH = CH,
+                     delta.dates = delta.dates,
+                     dp = dp,
+                     ddl = ddl,
+                     run.date = Sys.Date())
+
+saveRDS(Cm.results, file = "RData/CJS_Cm_RMark.rds")
+saveRDS(Cm.CJS.input, file = "RData/CJS_Cm_RMark_input.rds")
+
+```
+
+Export to Mark to see Release GOF or median c-hat.
+```{r}
+export.MARK(dp, 
+            project.name = "Mancini_Cm", 
+            model = Cm.results$Phi.tsm.p.t, 
+            replace = T, 
+            chat = 5.6)
+```
+
+Median c-hat test returned semi-acceptable results of estimated c-hat = 1.xxx, with 95%CI = ().  
+
+Release output is similar to what I find below from R2ucare.
+
+Compare results using AICc:
+
+```{r}
+model.table(Cm.results)
+```
+
+According to AICc, the best one is Phi(tsm)p(time). But c-hat > 4 (4.75)!  This is better than before but, obviously, this isn't a great model... What to do? 
+
+Look at the estimates:
+```{r}
+Cm.results$Phi.tsm.p.t$results$real
+```
+

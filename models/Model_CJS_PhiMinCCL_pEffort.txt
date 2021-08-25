@@ -1,0 +1,50 @@
+# Cormack-Jolly-Seber model - p.179 on Kery and 
+# Schaub, with individual-specific covariate on survival
+# and time-specific capture probabilities
+
+model {
+  for (i in 1:nind){
+    logit(phi[i]) <- mu + beta * x[i] + epsilon[i]
+    epsilon[i] ~ dnorm(0, tau)
+  }
+
+  for (t in 1:T){
+    
+    logit(p[t]) <- mu.p + beta.p * x[t] + epsilon.p[t]
+    epsilon.p[t] ~ dnorm(0, 1/var_logitP)
+     
+    N[t] <- n[t]/p[t]
+  }
+
+  mean.phi ~ dbeta(5, 2) #unif(0,1)
+  mu <- log(mean.phi / (1 - mean.phi))
+
+  beta ~ dnorm(0, 0.01)
+  sigma ~ dunif(0, 3)
+  tau <- pow(sigma, -2)
+  
+  mean.p ~ dbeta(5, 2) #unif(0,1)
+  mu.p <- log(mean.p / (1 - mean.p))
+
+  beta.p ~ dnorm(0, 0.01)
+  var_logitP ~ dgamma(5, 0.1)
+  sigma_logitP <- sqrt(var_logitP)
+  
+  # Likelihood:
+  for (i in 1:nind){
+    # define latent state at first capture
+    z[i, f[i]] <- 1
+    for (t in (f[i] + 1):n.occasions){
+      # state process
+      z[i,t] ~ dbern(mu1[i,t])
+      mu1[i,t] <- (phi[i] ^ dt[t]) * z[i, t-1]
+
+      # observation process
+      y[i,t] ~ dbern(mu2[i,t])
+      mu2[i,t] <- p[t-1] * z[i,t]  
+    }
+  }
+
+}
+
+
