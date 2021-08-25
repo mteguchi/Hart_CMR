@@ -17,19 +17,14 @@ library(ggridges)
 
 save.rds <- TRUE
 
-source("Mancini_functions.R")
+source("Hart_functions.R")
 
 # MCMC.params <- list(   n.chains = 3,
 #                        n.samples = 50000,
 #                        n.burnin = 30000,
 #                        n.thin = 5)
 
-dat.1.Cm <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE_v2.csv")
-
-#dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
-
-# Lo doesn't have enough (>2) recaptures. 
-#spp <- c("Cm", "Ei") #unique(dat.1$species)
+dat.1 <- get.data.Ei("data/GTC_base datos_Carey_2021-02-17am v2 TE.csv")
 
 MCMC.params <- list(n.chains = 3,
                     n.samples = 100000,
@@ -44,12 +39,12 @@ Find those that were captured more than once: (or better to use more than twice 
 
 ```{r}
 s <- 1
-jags.data <- Cm.vonBert.jags.data(dat.1.Cm)
+jags.data <- vonBert.jags.data(dat.1)
 data.vector <- as.vector(jags.data$jags.data$L) %>% 
   rep(each = MCMC.params$n.chains * n.per.chain)
 
 MCMC.params$model.file <-  "models/Model_RlinfRk_L.txt"
-if (!file.exists(paste0("RData/Rlinf_Rk_Cm_Aug2020.rds"))){
+if (!file.exists(paste0("RData/Rlinf_Rk_Ei_Aug2021.rds"))){
   parameters <- c('CV', 'k', 'A', 
                   'Linf', 'LinfMu', 'LinfSD', 
                   'Shape', 'rate', "loglik", #'kAlpha', 'kBeta', 
@@ -82,11 +77,11 @@ if (!file.exists(paste0("RData/Rlinf_Rk_Cm_Aug2020.rds"))){
   #                               r_eff = Reff.jm.1, 
   #                               cores = 4, k_threshold = 0.7)
   
-  if(save.rds) saveRDS(jm.1, file = paste0("RData/Rlinf_Rk_Cm_Aug2020.rds"))
-  if(save.rds) saveRDS(loo.out.jm.1, file = paste0("RData/LOO_Rlinf_Rk_Cm_Aug2020.rds"))
+  if(save.rds) saveRDS(jm.1, file = paste0("RData/Rlinf_Rk_Ei_Aug2021.rds"))
+  if(save.rds) saveRDS(loo.out.jm.1, file = paste0("RData/LOO_Rlinf_Rk_Ei_Aug2021.rds"))
 }
   
-if (!file.exists(paste0("RData/Rlinf_Fk_Cm_Aug2020.rds"))){
+if (!file.exists(paste0("RData/Rlinf_Fk_Ei_Aug2021.rds"))){
   MCMC.params$model.file <- "models/Model_Rlinf_Fk.txt"
   parameters <- c('CV', 'k', 'A', 
                   'Linf', 'LinfMu', 'LinfSD', 
@@ -108,13 +103,13 @@ if (!file.exists(paste0("RData/Rlinf_Fk_Cm_Aug2020.rds"))){
                                 data.vector = data.vector, 
                                 MCMC.params = MCMC.params)
   
-  if(save.rds) saveRDS(loo.out.jm.2, file = paste0("RData/LOO_Rlinf_Fk_Cm_Aug2020.rds"))
+  if(save.rds) saveRDS(loo.out.jm.2, file = paste0("RData/LOO_Rlinf_Fk_Ei_Aug2021.rds"))
   
-  if(save.rds) saveRDS(jm.1, file = paste0("RData/Rlinf_Fk_Cm_Aug2020.rds"))
+  if(save.rds) saveRDS(jm.1, file = paste0("RData/Rlinf_Fk_Ei_Aug2021.rds"))
   
 } 
 
-if (!file.exists(paste0("RData/Flinf_Fk_Cm_Aug2020.rds"))){
+if (!file.exists(paste0("RData/Flinf_Fk_Ei_Aug2021.rds"))){
   MCMC.params$model.file <- "models/Model_Flinf_Fk.txt"
   parameters <- c('CV', 'k', 'A', 
                   'Linf',  "loglik",
@@ -136,13 +131,13 @@ if (!file.exists(paste0("RData/Flinf_Fk_Cm_Aug2020.rds"))){
                                 data.vector = data.vector, 
                                 MCMC.params = MCMC.params)
   
-  if(save.rds) saveRDS(loo.out.jm.3, file = paste0("RData/LOO_Flinf_Fk_Cm_Aug2020.rds"))
+  if(save.rds) saveRDS(loo.out.jm.3, file = paste0("RData/LOO_Flinf_Fk_Ei_Aug2021.rds"))
   
-  if(save.rds) saveRDS(jm.1, file = paste0("RData/Flinf_Fk_Cm_Aug2020.rds"))
+  if(save.rds) saveRDS(jm.1, file = paste0("RData/Flinf_Fk_Ei_Aug2021.rds"))
   
 } 
 
-if (!file.exists(paste0("RData/Flinf_Rk_Cm_Aug2020.rds"))){
+if (!file.exists(paste0("RData/Flinf_Rk_Ei_Aug2021.rds"))){
   MCMC.params$model.file <- "models/Model_Flinf_Rk.txt"
   parameters <- c('CV', 'k', 'A', 
                   'Linf',  "loglik",
@@ -164,9 +159,9 @@ if (!file.exists(paste0("RData/Flinf_Rk_Cm_Aug2020.rds"))){
                                 data.vector = data.vector, 
                                 MCMC.params = MCMC.params)
   
-  if(save.rds) saveRDS(loo.out.jm.4, file = paste0("RData/LOO_Flinf_Rk_Cm_Aug2020.rds"))
+  if(save.rds) saveRDS(loo.out.jm.4, file = paste0("RData/LOO_Flinf_Rk_Ei_Aug2021.rds"))
   
-  if(save.rds) saveRDS(jm.1, file = paste0("RData/Flinf_Rk_Cm_Aug2020.rds"))
+  if(save.rds) saveRDS(jm.1, file = paste0("RData/Flinf_Rk_Ei_Aug2021.rds"))
   
 } 
 

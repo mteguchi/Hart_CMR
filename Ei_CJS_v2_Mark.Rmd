@@ -1,9 +1,9 @@
 ---
-title: "Capture recapture analyses for Agnese Mancini"
+title: "Capture recapture analyses of hawksbill turtles for Catherine Hart"
 output: html_notebook
 ---
 
-This document describes data analysis of Agnese Mancini's data of green turtle capture recapture events. 
+This document describes data analysis of Catherine Hart's data of hawksbill turtle capture recapture events. 
 
 
 Initialize the workspace
@@ -18,56 +18,18 @@ library(ggridges)
 library(RMark)
 library(R2ucare)
 
-source("Mancini_functions.R")
+source("Hart_functions.R")
 
-do_analysis <- function(dp, ddl)
-{
-  # create formulas for Phi
-  # tsm is time-since-marking; check for transient effects
-  Phi.dot <-  list(formula = ~ 1)  
-  #Phi.weight <- list(formula= ~ min_weight)   # many missing data 
-  #Phi.t <- list(formula = ~ time)             # we never have this model worked for turtles... 
-  #Phi.season <- list(formula = ~ sum_win)      # this also is unlikely... 
-  #Phi.transience <- list(formula = ~ Transient)
-  Phi.tsm <- list(formula = ~ tsm)
-  
-  #create formulas for p
-  p.dot <- list(formula = ~ 1)
-  p.t <- list(formula = ~ time)
-  p.tsm <- list(formula = ~ tsm)
-  #p.transience <- list(formula = ~ Transient)
-  #p.tsm.transience <- list(formula = ~ tsm + Transient)
-  #p.t.transience <- list(formula = ~ time + Transient)
-  p.effort <- list(formula = ~ effort)
-  p.season <- list(formula = ~ sum_win)
-  p.tsm.season <- list(formula = ~ tsm + sum_win)
-  p.tsm.effort <- list(formula = ~ tsm + effort)
-  
-  # create all combinations 
-  cml <- create.model.list("CJS")
-  
-  # run all all models and return as a list with class marklist
-  results <- mark.wrapper(cml,
-                          data=dp,
-                          ddl=ddl,
-                          output=FALSE,
-                          silent=TRUE)
-  return(results)
-}
 
 ```
 
 Bring in the data file and get ready for CJS
 
 ```{r warning=F}
-#dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
 
-dat.1.Cm <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE_v2.csv")
+dat.1 <- get.data.Ei("data/GTC_base datos_Carey_2021-02-17am v2 TE.csv")
 
-# there are In in the species code... 
-#dat.1 %>% filter(species == "Cm") -> dat.1.Cm
-
-CJS.data <- dat2CJS(dat.1.Cm, save.file = FALSE)
+CJS.data <- dat2CJS(dat.1, save.file = FALSE)
 
 CJS.data$data %>% rownames_to_column(var = "ID") -> CH.1 #data.CJS
 
@@ -93,7 +55,7 @@ CH.2 <- R2ucare::group_data(CJS.data$data, rep(1, nrow(CJS.data$data)))
 # transient.vec[n.cap > 1] <- 2
 
 # need to count how many capture events occurred per season
-dat.1.Cm %>% select(season, "DATE") %>% 
+dat.1 %>% select(season, "DATE") %>% 
   group_by(season) %>% #-> tmp3
   summarise(effort = n_distinct(DATE)) -> effort.season
 
@@ -130,12 +92,6 @@ tmp <- strsplit(colnames(CJS.data$data), split = "-")
 tmp2 <- lapply(tmp, FUN = function(x) x[2])
 tmp3 <- unlist(tmp2)
 
-# dp <- process.data(CH, 
-#                    model = "CJS", 
-#                    time.intervals = delta.dates,
-#                    groups = "Transient",
-#                    begin.time = 2001)
-
 dp <- process.data(CH, 
                    model = "CJS", 
                    time.intervals = delta.dates,
@@ -143,7 +99,7 @@ dp <- process.data(CH,
 
 ddl <- make.design.data(dp)
 
-# p is indexed from 2001.4
+# p is indexed from 2003
 # Phi is indexed from 2001
 
 # effort affects the capture probability (p)
@@ -173,7 +129,7 @@ ddl$Phi$tsm[ddl$Phi$age == 0] <- 2
 ddl$p$tsm <- 1
 ddl$p$tsm[ddl$p$age == 0] <- 2
 
-Cm.results <- do_analysis(dp = dp, ddl = ddl)
+Ei.results <- do_analysis(dp = dp, ddl = ddl)
 
 Cm.CJS.input <- list(raw.data = dat.1.Cm,
                      CJS.data = CJS.data,

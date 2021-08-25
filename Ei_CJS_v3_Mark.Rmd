@@ -1,11 +1,12 @@
 ---
-title: "Capture recapture analyses for Agnese Mancini"
+title: "Capture recapture analyses of hawksbill turtles for Catherine Hart"
 output: html_notebook
 ---
 
 October 2020.
+Updated August 2021
 
-This document describes data analysis of Agnese Mancini's data of green turtle capture recapture events. IN this version, we use community (sampling site) specific data for estimating survival/capture probability, and derived abundance using CJS models. 
+This document describes data analysis of Catherine Hart's data of hawksbill turtle capture recapture events. In this version, we use community (sampling site) specific data for estimating survival/capture probability, and derived abundance using CJS models. 
 
 
 Initialize the workspace
@@ -20,7 +21,7 @@ library(ggridges)
 library(RMark)
 library(R2ucare)
 
-source("Mancini_functions.R")
+source("Hart_functions.R")
 save.fig <- F
 ```
 
@@ -29,10 +30,10 @@ Bring in the data file and get ready for CJS
 ```{r warning=F}
 #dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
 
-dat.1.Cm <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE_v2.csv")
+dat.1 <- get.data.Ei("data/GTC_base datos_Carey_2021-02-17am v2 TE.csv")
 
 # Group by community and create CJS data for each community
-community.names <- levels(as.factor(dat.1.Cm$community))
+community.names <- levels(dat.1$community)
 
 # some communities don't have enough recaptures to do CMR modeling
 c <- 0

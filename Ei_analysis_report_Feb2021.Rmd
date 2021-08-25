@@ -1,8 +1,9 @@
 ---
 title: "Preliminary analyses of capture-recapture data for hawksbill turtles"
 author: "Tomo Eguchi"
-date: "2021-02-11"
-output: word_document
+date: "`r Sys.Date()`"
+output: 
+  bookdown:word_document2
 ---
 
 ```{r setup, include=FALSE}
@@ -29,8 +30,8 @@ This document summarizes preliminary analyses of capture-recapture data for hawk
 
 All statistical analyses were conducted using the R statistical environment (v. ```r paste0(R.version$major, ".", R.version$minor)```, R Development Team).
 
-# Somatic growth
-## Methods
+# Somatic growth {-}
+## Methods {-}
 I used a Bayesian version of von Bertalanffy growth model, which was developed for fish and invertebrates (Laslett et al. 2002, Eveson et al. 2007, Zhang et al, 2009) and used for green turtles (Eguchi et al. 2010). The model was fitted using JAGS (Plummer 2018) via the jagsUI package.
 
 There are two growth parameters in the von Bertalanffy function: L_inf and k.  L_inf is considered as the asymptotic size and k is the growth parameter.  Larger k values correspond to faster growths.  Four models were considered based on the assumptions of  the two parameters.  Each parameter was considered either "random" or "fixed."  When a parameter is "random," it comes from a distribution and each individual receives a unique value according to the distribution.  The mean and variance of the distribution are estimated as well as a value for each individual.  When a parameter is fixed, all individuals will have the same value.  The last parameter of the function is t_0, which is considered as the theoretical age at length 0.  In the Bayesian approach, the parameter t_0 is replaced with one that is interpreted as the age at tagging minus t_0 (A).
@@ -38,77 +39,72 @@ There are two growth parameters in the von Bertalanffy function: L_inf and k.  L
 I used the leave-one-out information criteria (LOOIC) to compare the performance of the four models (Vehtari et al. 2017).
 
 ```{r load_data, include=FALSE, echo=FALSE, cache=T}
-#dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
+# I found some missing IDs and wrong date format in the data file. Contacted Catherine on 2021-08-25. 
 
-# data/GTC_Cm Data_updated_2020-04-28.xls
-# Removed some columns (text) and converted ", " to "_"
-
-#dat.1 <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE.csv")
-# Capture_time included too many text so the field was deleted and v2 created.
-
-dat.1 <- get.data.Ei("data/GTC_Carey_2021-02-11_TE.csv")
+dat.1 <- get.data.Ei("data/GTC_base datos_Carey_2021-02-17am v2 TE.csv")
 
 ID.CCLna <- dat.1[which(is.na(dat.1$CCL)),]
 
 # check to see how many times each one of these were caught. 
-n.caps.ID.CCLna <- c(nrow(dat.1.Cm[dat.1.Cm$ID %in% lapply(ID.CCLna[,1], as.character)$ID[1],]),
-                     nrow(dat.1.Cm[dat.1.Cm$ID %in% lapply(ID.CCLna[,1], as.character)$ID[2],]),
-                     nrow(dat.1.Cm[dat.1.Cm$ID %in% lapply(ID.CCLna[,1], as.character)$ID[3],]))
+n.caps.ID.CCLna <- c(nrow(dat.1[dat.1$ID %in% lapply(ID.CCLna[,1], as.character)$ID[1],]),
+                     nrow(dat.1[dat.1$ID %in% lapply(ID.CCLna[,1], as.character)$ID[2],]),
+                     nrow(dat.1[dat.1$ID %in% lapply(ID.CCLna[,1], as.character)$ID[3],]))
 
 # some have only NAs so we get warnings
-dat.1.Cm %>% select(ID, CCL) %>% 
+dat.1 %>% select(ID, CCL) %>% 
   na.omit() %>%
   group_by(ID) %>%
   summarise(min_CCL = min(CCL, na.rm = T)) %>%
   filter(!is.infinite(min_CCL)) -> data.CCL
 
-CJS.data <- dat2CJS(dat.1.Cm, save.file = FALSE)
+CJS.data <- dat2CJS(dat.1, save.file = FALSE)
 
 CJS.data$data %>% rownames_to_column(var = "ID") -> data.CJS
 
 data.CCL  %>% left_join(data.CJS, by = "ID") %>%
   select(min_CCL) -> cov.CCL
 
-jags.data <- vonBert.jags.data(dat.1.Cm, "Cm")
+jags.data <- vonBert.jags.data(dat.1)
 
-jm.RLinf_Rk.Cm <- readRDS("RData/Rlinf_Rk_Cm_Aug2020.rds")
-jm.RLinf_Fk.Cm <- readRDS("RData/Rlinf_Fk_Cm_Aug2020.rds")
-jm.FLinf_Rk.Cm <- readRDS("RData/Flinf_Rk_Cm_Aug2020.rds")
-jm.FLinf_Fk.Cm <- readRDS("RData/Flinf_Fk_Cm_Aug2020.rds")
+# The following files were created as output from vonBertFit_Ei.Rmd
+jm.RLinf_Rk <- readRDS("RData/Rlinf_Rk_Ei_Aug2021.rds")
+jm.RLinf_Fk <- readRDS("RData/Rlinf_Fk_Ei_Aug2021.rds")
+jm.FLinf_Rk <- readRDS("RData/Flinf_Rk_Ei_Aug2021.rds")
+jm.FLinf_Fk <- readRDS("RData/Flinf_Fk_Ei_Aug2021.rds")
 
 
-LOOIC.RLinf_Rk.Cm <- readRDS("RData/LOO_Rlinf_Rk_Cm_Aug2020.rds")
-LOOIC.RLinf_Fk.Cm <- readRDS("RData/LOO_Rlinf_Fk_Cm_Aug2020.rds")
-LOOIC.FLinf_Rk.Cm <- readRDS("RData/LOO_Flinf_Rk_Cm_Aug2020.rds")
-LOOIC.FLinf_Fk.Cm <- readRDS("RData/LOO_Flinf_Fk_Cm_Aug2020.rds")
+LOOIC.RLinf_Rk <- readRDS("RData/LOO_Rlinf_Rk_Ei_Aug2021.rds")
+LOOIC.RLinf_Fk <- readRDS("RData/LOO_Rlinf_Fk_Ei_Aug2021.rds")
+LOOIC.FLinf_Rk <- readRDS("RData/LOO_Flinf_Rk_Ei_Aug2021.rds")
+LOOIC.FLinf_Fk <- readRDS("RData/LOO_Flinf_Fk_Ei_Aug2021.rds")
 
-LOOIC.DIC.Cm <- data.frame(model = c("RLinf_Rk", "RLinf_Fk", "FLinf_Rk", "FLinf_Fk"),
-                           LOOIC = c(LOOIC.RLinf_Rk.Cm$loo.out$estimates["looic", "Estimate"],
-                                     LOOIC.RLinf_Fk.Cm$loo.out$estimates["looic", "Estimate"],
-                                     LOOIC.FLinf_Rk.Cm$loo.out$estimates["looic", "Estimate"],
-                                     LOOIC.FLinf_Fk.Cm$loo.out$estimates["looic", "Estimate"]),
-                           SE = c(LOOIC.RLinf_Rk.Cm$loo.out$estimates["looic", "SE"],
-                                  LOOIC.RLinf_Fk.Cm$loo.out$estimates["looic", "SE"],
-                                  LOOIC.FLinf_Rk.Cm$loo.out$estimates["looic", "SE"],
-                                  LOOIC.FLinf_Fk.Cm$loo.out$estimates["looic", "SE"]),
-                           DIC = c(jm.RLinf_Rk.Cm$DIC, 
-                                   jm.RLinf_Fk.Cm$DIC, 
-                                   jm.FLinf_Rk.Cm$DIC, 
-                                   jm.FLinf_Fk.Cm$DIC),
-                           max.Rhat = c(max(jm.RLinf_Rk.Cm$summary %>% as.data.frame() %>% select(Rhat)),
-                                        max(jm.RLinf_Fk.Cm$summary %>% as.data.frame() %>% select(Rhat)),
-                                        max(jm.FLinf_Rk.Cm$summary %>% as.data.frame() %>% select(Rhat)),
-                                        max(jm.FLinf_Fk.Cm$summary %>% as.data.frame() %>% select(Rhat)))) %>%
+LOOIC.DIC <- data.frame(model = c("RLinf_Rk", "RLinf_Fk", "FLinf_Rk", "FLinf_Fk"),
+                           LOOIC = c(LOOIC.RLinf_Rk$loo.out$estimates["looic", "Estimate"],
+                                     LOOIC.RLinf_Fk$loo.out$estimates["looic", "Estimate"],
+                                     LOOIC.FLinf_Rk$loo.out$estimates["looic", "Estimate"],
+                                     LOOIC.FLinf_Fk$loo.out$estimates["looic", "Estimate"]),
+                           SE = c(LOOIC.RLinf_Rk$loo.out$estimates["looic", "SE"],
+                                  LOOIC.RLinf_Fk$loo.out$estimates["looic", "SE"],
+                                  LOOIC.FLinf_Rk$loo.out$estimates["looic", "SE"],
+                                  LOOIC.FLinf_Fk$loo.out$estimates["looic", "SE"]),
+                           DIC = c(jm.RLinf_Rk$DIC, 
+                                   jm.RLinf_Fk$DIC, 
+                                   jm.FLinf_Rk$DIC, 
+                                   jm.FLinf_Fk$DIC),
+                           max.Rhat = c(max(jm.RLinf_Rk$summary %>% as.data.frame() %>% select(Rhat)),
+                                        max(jm.RLinf_Fk$summary %>% as.data.frame() %>% select(Rhat)),
+                                        max(jm.FLinf_Rk$summary %>% as.data.frame() %>% select(Rhat)),
+                                        max(jm.FLinf_Fk$summary %>% as.data.frame() %>% select(Rhat)))) %>%
   arrange(by = LOOIC)
 
-#LOOIC.DIC.Cm
+#LOOIC.DIC
 ```
 
-# Results
-There were ```r length(unique(dat.1.Cm$ID))``` individuals in the dataset, where CCL records were missing from ```r sum(is.na(dat.1.Cm$CCL))``` captures.  Three individuals were caught once (```r lapply(ID.CCLna[,1], as.character)$ID[1]```  on ```r ID.CCLna[1, "DATE"]```, ```r lapply(ID.CCLna[,1], as.character)$ID[2]```  on ```r ID.CCLna[2, "DATE"]```, and ```r lapply(ID.CCLna[,1], as.character)$ID[3]```  on ```r ID.CCLna[3, "DATE"]``` ).  These turtles were excluded from the analysis.        
+# Results {-}
+There were `r length(unique(dat.1.Cm$ID))` individuals in the dataset, where CCL records were missing from `r sum(is.na(dat.1.Cm$CCL))` captures.  Three individuals were caught once (`r lapply(ID.CCLna[,1], as.character)$ID[1]`  on `r ID.CCLna[1, "DATE"]`, `r lapply(ID.CCLna[,1], as.character)$ID[2]`  on `r ID.CCLna[2, "DATE"]`, and `r lapply(ID.CCLna[,1], as.character)$ID[3]`  on `r ID.CCLna[3, "DATE"]` ).  These turtles were excluded from the analysis.        
 
-## Size distribution
-CCL at first captures ranged from ```r min(cov.CCL$min_CCL)``` cm to ```r max(cov.CCL$min_CCL)``` cm (mean of ```r signif(mean(dat.1.Cm$CCL, na.rm = T), 4)``` cm).  
+## Size distribution {-}
+CCL at first captures ranged from `r min(cov.CCL$min_CCL)` cm to `r max(cov.CCL$min_CCL)` cm (mean of `r signif(mean(dat.1.Cm$CCL, na.rm = T), 4)` cm).  
 
 ```{r CCL_histo, warning=FALSE, echo=FALSE, include=F}
 
@@ -118,25 +114,20 @@ p.CCL.histo <- ggplot(data = cov.CCL) +
   xlab("CCL at first capture (cm)")
 
 if (save.fig)
-  ggsave(filename = "figures/Cm_CCL_histo.png", plot = p.CCL.histo,
+  ggsave(filename = "figures/Ei_CCL_histo.png", plot = p.CCL.histo,
          device = "png", dpi = 600)
 ```
 
-```{r plot_CCL_histo, echo=FALSE, cache=TRUE, fig.cap = "Figure 1. The distribution of CCL when turtles were caught first time."}
-knitr::include_graphics(paste0("figures/Cm_CCL_histo.png"))
+```{r plot.CCL.histo, echo=FALSE, cache=TRUE, fig.cap = "The distribution of CCL when turtles were caught first time."}
+knitr::include_graphics(paste0("figures/Ei_CCL_histo.png"))
 ```
 
 The size distribution of turtles at the first capture indicated that the majority of green turtles in this area recruited as juveniles, although some were large.  There were pulses of small juveniles (~ 55 cm) found in some years (e.g., 2001-2005, 2008, 2013-2015; Figure 2).
 
-```{r SCL change, echo=FALSE, warning=FALSE, message = FALSE}
-dat.1.Cm %>% mutate(Yr = year(DATE)) -> dat.1.Cm
+```{r SCL.change, echo=FALSE, warning=FALSE, message = FALSE}
+dat.1 %>% mutate(Yr = year(DATE)) -> dat.1
 
-# dat.1.Cm %>% mutate(Year.Group = if_else(Yr>=2015, "2015-2019",
-#                                          if_else(Yr>=2010 & Yr<=2014, "2010-2014",
-#                                                  if_else(Yr>=2005 & Yr <= 2009, "2005-2009", "2000-2004")))) -> dat.1.Cm
-                    
-
-dat.1.Cm %>% group_by(ID) %>% 
+dat.1 %>% group_by(ID) %>% 
   summarize(firstCap = first(DATE),
             firstGroup = first(Yr),
             firstCCL = first(CCL)) %>%
@@ -152,12 +143,12 @@ p.change.CCL <- ggplot(data=firstcap_only,
   coord_flip() +
   theme(axis.text.x = element_text(angle = 45,
                                    vjust = 0.5)) + 
-  labs(title="Change in size distribution of green turtles (first captures)") +
+  labs(title="Change in size distribution of hawksbill turtles (first captures)") +
   xlab("CCL (cm)") +
   ylab("")
 
 if (save.fig)
-  ggsave(filename = "figures/Cm_ChangeInSize.png", 
+  ggsave(filename = "figures/Ei_ChangeInSize.png", 
          plot = p.change.CCL,
          device = "png", dpi = 600, 
          width = 6.29, height = 3.68, units = "in")
@@ -166,31 +157,31 @@ if (save.fig)
 ```
 
 
-```{r plot_change_CCL, echo=FALSE, cache=TRUE, fig.cap= "Figure 2. Change in size distributions of green turtles that were caught first time"}
+```{r plot.change.CCL, echo=FALSE, cache=TRUE, fig.cap= "Change in size distributions of hawksbill turtles that were caught first time"}
 knitr::include_graphics(paste0("figures/Cm_ChangeInSize.png"))
 ```
 
 
 ```{r sizeBySeason, echo=FALSE, include=FALSE, cache=T}
-dat.1.Cm %>% select(season, CCL) %>%
+dat.1 %>% select(season, CCL) %>%
   group_by(season) %>%
-  na.omit() -> dat.1.Cm.CCL 
+  na.omit() -> dat.1.CCL 
 
-dat.1.Cm %>% select(season, CCL) %>%
+dat.1 %>% select(season, CCL) %>%
   group_by(season) %>%
   summarise(mean = mean(CCL, na.rm = T),
             n = length(CCL),
             SE = sqrt(var(CCL))/sqrt(length(CCL)),
             Low = mean - 2 * SE,
             High = mean + 2 * SE,
-            min = min(CCL, na.rm = T),
-            max = max(CCL, na.rm = T)) -> CCL.mean.season.Cm
+            min = min(CCL, na.rm = Tp),
+            max = max(CCL, na.rm = T)) -> CCL.mean.season
 
-CCL.mean.season.Cm[is.na(CCL.mean.season.Cm$SE), "SE"] <- 0
-CCL.mean.season.Cm[is.na(CCL.mean.season.Cm$Low), "Low"] <- CCL.mean.season.Cm[is.na(CCL.mean.season.Cm$Low), "mean"]
-CCL.mean.season.Cm[is.na(CCL.mean.season.Cm$High), "High"] <- CCL.mean.season.Cm[is.na(CCL.mean.season.Cm$High), "mean"]
+CCL.mean.season[is.na(CCL.mean.season$SE), "SE"] <- 0
+CCL.mean.season[is.na(CCL.mean.season$Low), "Low"] <- CCL.mean.season[is.na(CCL.mean.season$Low), "mean"]
+CCL.mean.season[is.na(CCL.mean.season$High), "High"] <- CCL.mean.season[is.na(CCL.mean.season$High), "mean"]
 
-p.size.by.season <- ggplot(data = dat.1.Cm.CCL) +
+p.size.by.season <- ggplot(data = dat.1.CCL) +
   geom_boxplot(aes(x = season, y = CCL)) +
   # geom_point(aes(x = season, 
   #                y = mean)) + 
@@ -212,24 +203,23 @@ p.size.by.season <- ggplot(data = dat.1.Cm.CCL) +
 
 if (save.fig)
   ggsave(plot = p.size.by.season, 
-         filename = "figures/Cm_SizeBySeason.png",
+         filename = "figures/Ei_SizeBySeason.png",
          device = "png", dpi = 600)
 ```
 
 
-```{r plot_SizeBySeason, echo=FALSE, cache=TRUE, fig.cap="Figure 3. Season-specific size distributions of green turtles"}
-knitr::include_graphics(paste0("figures/Cm_SizeBySeason.png"))
+```{r plot.SizeBySeason, echo=FALSE, cache=TRUE, fig.cap="Season-specific size distributions of hawksbill turtles"}
+knitr::include_graphics(paste0("figures/Ei_SizeBySeason.png"))
 ```
 
 
-## von Bertalanffy growth function
+## von Bertalanffy growth function {-}
 
-When the von Bertalanffy growth function was fitted to the length data, convergence was reached for all models according to the Gelman-Rubin Rhat statistic (Rhat < 1.1) and visual inspections of Markov chain Monte Carlo simulations (Appendix).  
+When the von Bertalanffy growth function was fitted to the length data, convergence was reached for all but one model (FLinf_Rk) according to the Gelman-Rubin Rhat statistic and visual inspections of Markov chain Monte Carlo simulations (Appendix).  
 
-According to the LOOIC, the random L_inf and fixed k model was the best.  The median of the distribution of L_inf was ```r signif(jm.RLinf_Fk.Cm$q50$LinfMu, 2)``` cm (95% CI = ```r signif(jm.RLinf_Fk.Cm$q2.5$LinfMu, 2)``` cm - ```r signif(jm.RLinf_Fk.Cm$q97.5$LinfMu, 2)``` cm).  The median growth coefficient (k) was ```r signif(jm.RLinf_Fk.Cm$q50$k, 2)```  (95% CI = ```r signif(jm.RLinf_Fk.Cm$q2.5$k, 2)``` - ```r signif(jm.RLinf_Fk.Cm$q97.5$k, 2)```).  The median of A parameter (age at tagging minus the theoretical age at length = 0), ranged from ```r signif(min(jm.RLinf_Fk.Cm$q50$A), 3)``` to ```r signif(max(jm.RLinf_Fk.Cm$q50$A), 3)``` with the mean of ```r signif(mean(jm.RLinf_Fk.Cm$q50$A), 3)```.  All these estimates indicated slow growths of green turtles in this environment. (I think a more typical value is k = 0.06 - 0.08)
+According to the LOOIC, the random L_inf and k model was the best.  The median of the distribution of L_inf was `r signif(jm.RLinf_Rk$q50$LinfMu, 2)` cm (95% CI = `r signif(jm.RLinf_Rk$q2.5$LinfMu, 2)` cm - `r signif(jm.RLinf_Rk$q97.5$LinfMu, 2)` cm).  The median growth coefficient (k) was `r signif(jm.RLinf_Rk$q50$k, 2)`  (95% CI = `r signif(jm.RLinf_Rk$q2.5$k, 2)` - `r signif(jm.RLinf_Rk$q97.5$k, 2)`).  The median of A parameter (age at tagging minus the theoretical age at length = 0), ranged from `r signif(min(jm.RLinf_Rk$q50$A), 3)` to `r signif(max(jm.RLinf_Rk$q50$A), 3)` with the mean of `r signif(mean(jm.RLinf_Rk$q50$A), 3)`.  All these estimates indicated slow growths of hawksbill turtles in this environment. (I think a more typical value is k = 0.06 - 0.08)
 
 ```{r plot_vB,  echo=FALSE, include=F, cache=T}
-k.samples <- extract.samples("k", jm.RLinf_Fk.Cm$samples)
 
 time.vec <- 0:59
 
@@ -239,8 +229,9 @@ time.mat <- L_Exp.med <- L_Exp.lo <- L_Exp.hi <- matrix(ncol = length(unique.ID)
 
 t <- i <- 1
 for (i in 1:length(unique.ID)){
-  A.samples <- extract.samples(paste0("A[", i, "]"), jm.RLinf_Fk.Cm$samples)
-  Linf.samples <- extract.samples(paste0("Linf[", i, "]"), jm.RLinf_Fk.Cm$samples)
+  A.samples <- extract.samples(paste0("A[", i, "]"), jm.RLinf_Rk$samples)
+  Linf.samples <- extract.samples(paste0("Linf[", i, "]"), jm.RLinf_Rk$samples)
+  k.samples <- extract.samples(paste0("k[", i, "]"), jm.RLinf_Rk$samples)
   for (t in 1:length(time.vec)){
     L_Exp <-  Linf.samples * (1.0 - exp(-k.samples * (A.samples + time.vec[t])))
     L_Exp.med[t,i] <- quantile(L_Exp, 0.5)
@@ -284,25 +275,25 @@ p.vB.fit <- ggplot() +
   theme(legend.position = "none")
 
 if (save.fig)
-  ggsave(plot = p.vB.fit,filename = "figures/Cm_vB_fit.png",
+  ggsave(plot = p.vB.fit,filename = "figures/Ei_vB_fit.png",
          device = "png", dpi = 600)
 ```
 
 
-```{r plot_vB_fit, echo=FALSE, cache=TRUE, fig.cap="Figure 4. Fitted von Bertalanffy growth model"}
+```{r plot.vB.fit, echo=FALSE, cache=TRUE, fig.cap="Fitted von Bertalanffy growth model"}
 knitr::include_graphics(paste0("figures/Cm_vB_fit.png"))
 ```
 
-## Survival and abundance
+## Survival and abundance {-}
 
 I fitted Cormack-Jolly-Seber (CJS) models to the capture-recapture histories for this preliminary analyses.  It may be worthwhile to explore other models, such as multi-state and robust-design, in the future.  Briefly, the CJS model uses the capture history of each individual without assuming that the population is closed. There are two main parameters in the basic model; survival rate (phi) and capture/recapture probability (p).  The abundance may be estimated through the Horvitz-Thompson estimator, where the number of captured individuals per temporal sampling period is divided by the estimated capture probability for that time period. The estimated survival rate should be considered as an apparent survival rate as the permanent emigrant is considered as dead.  Effects of transients, however, can be determined.   
 
 The basic model can be extended to accommodate various modifications, such as time-dependent survival rates, time-dependent capture probability, covariate-dependent survival rates and capture probabilities.    
 
-### Methods
+### Methods {-}
 
 ```{r CMR_data, include=FALSE, echo=FALSE, cache=T}
-CJS.data <- readRDS(file = "RData/CJS_Cm_RMark_input.rds")
+CJS.data <- readRDS(file = "RData/CJS_Ei_RMark_input.rds")
 # dat.1.Cm <- get.data.Cm("data/GTC_Cm Data_updated_2020-04-28_TE_v2.csv")
 # #dat.1 <- get.data("data/GTC_20190725_Tomo_v2.csv")
 # 

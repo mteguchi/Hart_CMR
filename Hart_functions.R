@@ -39,7 +39,7 @@ do_analysis <- function(dp, ddl)
   #create formulas for p
   p.dot <- list(formula = ~ 1)
   p.t <- list(formula = ~ time)
-  p.tsm <- list(formula = ~ tsm)
+  #p.tsm <- list(formula = ~ tsm)
   #p.transience <- list(formula = ~ Transient)
   #p.tsm.transience <- list(formula = ~ tsm + Transient)
   #p.t.transience <- list(formula = ~ time + Transient)
@@ -101,9 +101,9 @@ Ei.vonBert.jags.data <- function(dat.1){
 
 
 
-vonBert.jags.data <- function(dat.1, sp.code){
+vonBert.jags.data <- function(dat.1){
   # remove rows with is.na(CCL) is true:
-  dat.1 %>% filter(species == sp.code) %>%
+  dat.1 %>% 
     filter(!is.na(CCL)) -> dat.2
   
   n.cap.ID <- table(dat.2$ID)
@@ -140,174 +140,60 @@ vonBert.jags.data <- function(dat.1, sp.code){
               ID = unique.ID))
 }
 
-get.data.Cm <- function(filename){
-  col.def <- cols(Event_ID = col_character(),
-                  Turtle_no = col_integer(),
-                  Count = col_integer(),
-                  Season = col_character(),
-                  Year = col_integer(),
-                  Month = col_integer(),
-                  Day = col_integer(),
-                  Sp_code = col_character(),
-                  Turtle_ID = col_character(),
-                  Recapture = col_character(),
-                  Community_code = col_character(),
-                  Start_date = col_date(format = "%m/%d/%Y"),
-                  Start_time = col_time(format = "%H:%M"),
-                  End_time = col_time(format = "%H:%M"),
-                  Tot_hours = col_double(),
-                  Tot_hours_estimated = col_double(),
-                  Monitoring_type = col_character(),
-                  Monitoring_technique = col_character(),
-                  Region = col_character(),
-                  Site_type_general = col_character(),
-                  Type_site_specific = col_character(),
-                  Lat = col_double(),
-                  Long = col_double(),
-                  Capture_date = col_date(format = "%m/%d/%Y"),
-                  Species = col_character(),
-                  SCL = col_double(),
-                  SCW = col_double(),
-                  CCL = col_double(),
-                  CCW = col_double(),
-                  BD = col_double(),
-                  PL = col_double(),
-                  TTL = col_double(),
-                  Weight = col_double(),
-                  Sex = col_character(),
-                  Right_tag_new = col_character(),
-                  Left_tag_new = col_character(),
-                  Right_tag_old = col_character(),
-                  Left_tag_old = col_character())
-  
-  dat.1 <- read_csv(file = filename, col_types = col.def)
-  
-  dat.1 %>% mutate(ID = as.factor(Turtle_ID),
-                   CDATE = Capture_date) %>% 
-    transmute(ID = ID,
-              detect = 1,
-              DATE = CDATE,
-              season = as.factor(Season),
-              SCL = SCL,
-              CCL = CCL,
-              weight_kg = Weight,
-              sex = Sex,
-              species = as.factor(Sp_code),
-              community = Community_code)-> dat.1
-  
-  return(dat.1)
-}
-
-get.data <- function(filename){
+# type_site_spec, site_name were deleted because there are commas in the field. 2021-08-25
+# Also, Data_owner, Contact and Use were deleted 2021-08-25
+get.data.Ei <- function(filename){
   col.def <- cols(monitoring_event = col_character(),
                   value = col_integer(),
                   season = col_character(),
                   year = col_integer(),
                   month = col_integer(),
                   day = col_integer(),
-                  species = col_character(),
-                  turtle_code = col_character(),
+                  species = col_factor(),
+                  turtle_code = col_factor(),
                   recapture = col_character(),
-                  community = col_character(),
-                  start_date = col_date(format = "%d/%m/%Y"),
+                  community = col_factor(),
+                  start_date = col_date(format = "%m/%d/%Y"),
                   tot_hours = col_double(),
-                  type_monitoring = col_character(),
+                  type_monitoring = col_factor(),
                   methodology = col_character(),
-                  longitude_net = col_number(),
-                  type_site_gen = col_character(),
-                  type_site_spec = col_character(),
-                  site_name = col_character(),
+                  longitude_net = col_double(),
+                  type_site_gen = col_factor(),
                   latitude = col_double(),
                   longitude = col_double(),
                   SCL_CCL = col_double(),
-                  SCL = col_double(),
+                  capture_date = col_date(format = "%m/%d/%Y"),
+                  name = col_character(),
+                  SCL_min = col_double(),
+                  SCL_max = col_double(),
                   SCW = col_double(),
-                  CCL = col_double(),
+                  CCL_min = col_double(),
+                  CCL_max = col_double(),
                   CCW = col_double(),
                   BD = col_double(),
                   PL = col_double(),
                   TTL = col_double(),
-                  weight_kg = col_double(),
-                  sex = col_character(),
-                  tipe_monitoring = col_character(),
-                  BCI = col_double(),
-                  Condition = col_character(),
-                  Recapture_new = col_character())
+                  Weight_kg = col_double(),
+                  sex = col_factor(),
+                  Marca_n_dx = col_character())
   
   dat.1 <- read_csv(file = filename, col_types = col.def)
   
-  dat.1 %>% mutate(ID = as.factor(turtle_code),
-                   CDATE = as.Date(paste0(year, "-", month, "-", day))) %>% 
+  dat.1 %>% mutate(ID = turtle_code,
+                   CDATE = capture_date) %>%
     transmute(ID = ID,
               detect = 1,
-              species = as.factor(species),
               DATE = CDATE,
               season = as.factor(season),
-              SCL = SCL,
-              CCL = CCL,
-              weight_kg = weight_kg,
-              sex = sex)-> dat.1
+              SCL = SCL_max,
+              CCL = CCL_max,
+              weight_kg = Weight_kg,
+              sex = sex,
+              community = community)  -> dat.2
   
-  # "indefindio" species are greens per Agnese 
-  # email on 2019-09-04
-  dat.1[dat.1$species == "In", "species"] <- "Cm"
-  
-  return(dat.1)
+  return(dat.2)
 }
 
-get.data.Ei <- function(filename){
-  col.def <- cols(Event_ID = col_character(),
-                  Season = col_character(),
-                  Species = col_character(),
-                  Turtle_ID = col_character(),
-                  Recapture = col_character(),
-                  Location = col_character(),
-                  Start_time = col_time(format = "%H:%m"),
-                  End_time = col_time(format = "%H:%m"),
-                  Total_hrs = col_double(),
-                  Type = col_character(),
-                  Metodologia = col_character(),
-                  Longitud_lanceos = col_character(),
-                  Site_type_general = col_character(),
-                  Site_type_specific = col_character(),
-                  site_name = col_character(),
-                  Lat_Corr = col_double(),
-                  Long_Corr = col_double(),
-                  Capture_date = col_date(format = "%m/%d/%Y"),
-                  Capture_time = col_time(format = "%H:%m"),
-                  Turlte_name = col_character(),
-                  SCL = col_double(),
-                  SCW = col_double(),
-                  CCL = col_double(),
-                  CCW = col_double(),
-                  BD = col_double(),
-                  PL = col_double(),
-                  TTL = col_double(),
-                  Weight = col_double(),
-                  Sex = col_character(),
-                  tag_r_new = col_character(),
-                  tag_l_new = col_character(),
-                  tag_r_old = col_character(),
-                  tag_l_old = col_character(),
-                  Pit_tag = col_character(),
-                  pit_new = col_character(),
-                  Pit_old = col_character())
-  
-  dat.1 <- read_csv(file = filename, col_types = col.def)
-  
-  dat.1 %>% mutate(ID = as.factor(Turtle_ID),
-                   CDATE = Capture_date) %>% 
-    transmute(ID = ID,
-              season = Season,
-              detect = 1,
-              DATE = CDATE,
-              SCL = SCL,
-              CCL = CCL,
-              weight_kg = Weight,
-              sex = Sex)-> dat.1
-  
-  return(dat.1)
-}
 
 
 dat2CJS <- function(dat.1, save.file = FALSE, filename = "not.saved"){
