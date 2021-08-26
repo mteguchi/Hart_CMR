@@ -20,7 +20,7 @@ library(RMark)
 library(loo)
 library(R2ucare)
 
-save.fig <- F
+save.fig <- T
 
 source("Hart_functions.R")
 
@@ -174,7 +174,7 @@ dat.1 %>% select(season, CCL) %>%
             SE = sqrt(var(CCL))/sqrt(length(CCL)),
             Low = mean - 2 * SE,
             High = mean + 2 * SE,
-            min = min(CCL, na.rm = Tp),
+            min = min(CCL, na.rm = T),
             max = max(CCL, na.rm = T)) -> CCL.mean.season
 
 CCL.mean.season[is.na(CCL.mean.season$SE), "SE"] <- 0
@@ -281,7 +281,7 @@ if (save.fig)
 
 
 ```{r plot.vB.fit, echo=FALSE, cache=TRUE, fig.cap="Fitted von Bertalanffy growth model"}
-knitr::include_graphics(paste0("figures/Cm_vB_fit.png"))
+knitr::include_graphics(paste0("figures/Ei_vB_fit.png"))
 ```
 
 ## Survival and abundance {-}
@@ -318,8 +318,8 @@ effort.season <- CJS.data$effort
 # data.CCL %>% left_join(dat.1.CCL, by = "ID") %>%
 #   select(-min_CCL) -> dat.2.CCL
 
-Cm.results <- readRDS(file = "RData/CJS_Cm_RMark.rds")
-mark.table <- model.table(Cm.results) %>% rownames_to_column(var = "ID")
+Ei.results <- readRDS(file = "RData/CJS_Ei_RMark.rds")
+mark.table <- model.table(Ei.results) %>% rownames_to_column(var = "ID")
 
 mark.table %>% select(ID, model, DeltaAICc) -> mark.table.2
 
@@ -336,26 +336,40 @@ mark.table$Model <- tmp
 
 knitr::kable(mark.table %>% select(ID, Phi, p, Model) %>% arrange(by = as.numeric(ID)), 
              digits = 2,
-             caption = "Table 1. Definitions of 14 CJS models fitted to CMR data of green turtles. ",
+             caption = "Table 1. Definitions of 14 CJS models fitted to CMR data for hawksbill turtles. ",
              table.attr = "style='width:30%;'")
 ```
 
-Analyses were conducted using the maximum likelihood approach using Mark (White and Cooch Yr) through RMark (v. ```r packageVersion("RMark")```, Laake 2013). 
+Analyses were conducted using the maximum likelihood approach using Mark (White and Cooch Yr) through RMark (v. `r packageVersion("RMark")`, Laake 2013). 
 
-### Results
+### Results {-}
 
-There were ```r nrow(CJS.data$CJS.data$data)``` individuals in the capture records. After grouping capture records within each season, capture histories from ```r ncol(data.CJS)``` seasons (occasions) were used in the analysis. The number of capture events within each season ranged from ```r min(CJS.data$effort$effort)``` to ```r max(CJS.data$effort$effort)```, whereas the number of turtles caught per season ranged from ```r min(colSums(CJS.data$CJS.data$data))``` to ```r max(colSums(CJS.data$CJS.data$data))```.   
+There were `r nrow(CJS.data$CJS.data$data)` individuals in the capture records. After grouping capture records within each season, capture histories from `r ncol(data.CJS)` seasons (occasions) were used in the analysis. The number of capture events within each season ranged from `r min(CJS.data$effort$effort)` to `r max(CJS.data$effort$effort)`, whereas the number of turtles caught per season ranged from `r min(colSums(CJS.data$CJS.data$data))` to `r max(colSums(CJS.data$CJS.data$data))`.   
 
 For this report, I use results from Mark because Bayesian analysis is taking a lot of time due to the large dataset.  Goodness-of-fit has been conducted and, although some questions remain as to the CJS model may not be perfect, in general, it is accepted.  
 
-#### Goodness-of-fit
-```{r GOF_test3sr, echo=FALSE, include=F, cache=T}
+#### Goodness-of-fit {-}
+```{r GOF, echo=FALSE, include=F, cache=T}
 #CJS.data$data %>% rownames_to_column(var = "ID") -> CH.1 #data.CJS
 library(R2ucare)
 
 # using R2ucare::group_data to combine CHs
 CH.Ucare <- CJS.data$CH.R2ucare
 
+overall <- list(test.out = overall_CJS(as.matrix(CH.Ucare[, 1:(ncol(CH.Ucare)-1)]), 
+                                       freq = CH.Ucare$effY)) 
+  
+test3sr <- list(test.out = test3sr(as.matrix(CH.Ucare[, 1:(ncol(CH.Ucare)-1)]), 
+                                   freq = CH.Ucare$effY)) 
+  
+test3sm <- list(test.out = test3sm(as.matrix(CH.Ucare[, 1:(ncol(CH.Ucare)-1)]), 
+                                   freq = CH.Ucare$effY))
+  
+test2ct <- list(test.out = test2ct(as.matrix(CH.Ucare[, 1:(ncol(CH.Ucare)-1)]), 
+                                   freq = CH.Ucare$effY))
+  
+test2cl <- list(test.out = test2cl(as.matrix(CH.Ucare[, 1:(ncol(CH.Ucare)-1)]), 
+                                   freq = CH.Ucare$effY))
 # Need to do some GOF testing here.
 # TEST3.SR tests the hypothesis that there is no difference among previously and newly marked
 #individuals captured at time (i) in the probability of being recaptured at some later time > i (i.e., that
@@ -370,20 +384,20 @@ test3sr.signif <- filter(test3sr.details, p_val < 0.05)
 test3sr.signif.01 <- filter(test3sr.details, p_val < 0.01)
 ```
 
-##### TEST3.SR
+##### TEST3.SR {-}
 TEST3.SR asks "of those individuals seen either on or before occasion (i), what proportion were ever seen again?" According to the Book (Mark Book), it states that "If TEST3.SR is rejected, then this suggests that there is a difference in 'survival' among individuals, depending on whether or not they were seen for the first time either on or before occasion (i)." 
 
-There were ```r nrow(test3sr.signif)``` occasions that were flagged by this statistic (Table 2). Note that if we decrease the alpha level to 0.01, ```r nrow(test3sr.signif.01)``` occasions would be flagged. (I know this is not the correct way to do a statistical analysis but just pointing out the somewhat arbitrary nature of the significance tests.)
+There were `r nrow(test3sr.signif)` occasions that were flagged by this statistic (Table \@ref(tab:table.test3sr)). Note that if we decrease the alpha level to 0.01, `r nrow(test3sr.signif.01)` occasions would be flagged. (I know this is not the correct way to do a statistical analysis but just pointing out the somewhat arbitrary nature of the significance tests.)
 
-```{r table_test3sr, echo=F, include=T}
+```{r table.test3sr, echo=F, include=T}
 knitr::kable(test3sr.signif, 
              digits = 2,
              col.names = c("Occasion", "Stat", "p val", "signed test", "test"),
-             caption = "Table 2. Significant results from Test3.sr, which evaluates difference in survival among individuals depending on whether or not they were seen for the first time either on or before the i-th occasion",
+             caption = "Significant results from Test3.sr, which evaluates difference in survival among individuals depending on whether or not they were seen for the first time either on or before the i-th occasion",
              table.attr = "style='width:30%;'")
 ```
 
-##### TES3.Sm
+##### TES3.Sm {-}
 
 TEST3.Sm tests the hypothesis that there is no difference in the expected time of first recapture between the ‘new’ and ‘old’ individuals captured at occasion i and seen again at least once. It looks at individuals who were seen again. "Among these individuals seen again, when they were seen again does not depend on whether or not they were seen for the first time at occasion (i)."
 
@@ -399,82 +413,18 @@ test3sm.signif <- filter(test3sm.details, p_val < 0.05)
 ```
 
 
-```{r table_test3sm, echo=F, include=T}
+```{r table.test3sm, echo=F, include=T}
 knitr::kable(test3sm.signif, 
              digits = 2,
              col.names = c("Occasion", "Stat", "p val", "signed test", "test"),
-             caption = "Table 3. Significant results from Test3.sm, which evaluates difference in the expected time of first recapture between the ‘new’ and ‘old’ individuals captured at occasion i and seen again at least once",
+             caption = "Significant results from Test3.sm, which evaluates difference in the expected time of first recapture between the ‘new’ and ‘old’ individuals captured at occasion i and seen again at least once",
              table.attr = "style='width:30%;'")
 ```
 
-According to Test3.sm, ```r nrow(test3sm.signif)``` occasions were significantly different from the null hypothesis. I looked into time between captures of  the individuals that were caught at these ```r nrow(test3sm.signif)``` occasions and caught at least once more. 
+According to Test3.sm, `r nrow(test3sm.signif)` occasions were significantly different from the null hypothesis. I looked into time between captures of the individuals that were caught at these `r nrow(test3sm.signif)` occasions and caught at least once more. 
 
-To make a comparison, I look at an occasion that passed the test:
 
-```{r test3m_passed, echo=F, include=F}
-data.0 <- CJS.data$CJS.data$data
-
-# cumulative sum of captures per individual:
-cumulative.capture <- t(apply(data.0, FUN = cumsum, MARGIN = 1))
-
-# first filter rows with 1s on the 25th column (one example of not significant)
-# those that were caught first time at the 25th occasion
-idx <- 25
-data.25.first <- data.0[(cumulative.capture[,(idx-1)] == 0 & cumulative.capture[, idx] == 1), idx:ncol(data.0)]
-
-# those that were caught before and at the 25th occasion
-data.25.recap <- data.0[(cumulative.capture[, (idx-1)] > 0 & data.0[,idx] == 1), idx:ncol(data.0)] #%>%
-
-# look at the recaptures, given they were caught on the 25th occasion. 
-#data.25.3sm.recap <- data.25[, c(2:ncol(data.25))]
-rowSums.25.recap<- rowSums(data.25.recap)
-rowSums.25.first <- rowSums(data.25.first)
-
-```
-
-The maximum number of recaptures for those that were caught first time at the 25th occasion was ```r max(rowSums.25.first)``` whereas that for those turtles that were caught before the 25th and at the 25th occasions was ```r max(rowSums.25.recap)```. 
-
-Then look at what happened in those occasions (4, 7, 37). 
-
-```{r test3m_failed, echo=F, include=F}
-# those that were caught first time at the 4th occasion
-idx <- 4
-data.4.first <- data.0[(cumulative.capture[,(idx-1)] == 0 & cumulative.capture[, idx] == 1), idx:ncol(data.0)]
-
-# those that were caught before and at the 4th occasion
-data.4.recap <- data.0[(cumulative.capture[, (idx-1)] > 0 & data.0[,idx] == 1), idx:ncol(data.0)] #%>%
-
-# look at the recaptures, given they were caught on the 4th occasion. 
-rowSums.4.recap<- rowSums(data.4.recap)
-rowSums.4.first <- rowSums(data.4.first)
-
-# those that were caught first time at the 7th occasion
-idx <- 7
-data.7.first <- data.0[(cumulative.capture[,(idx-1)] == 0 & cumulative.capture[, idx] == 1), idx:ncol(data.0)]
-
-# those that were caught before and at the 7th occasion
-data.7.recap <- data.0[(cumulative.capture[, (idx-1)] > 0 & data.0[,idx] == 1), idx:ncol(data.0)] #%>%
-
-# look at the recaptures, given they were caught on the 7th occasion. 
-rowSums.7.recap<- rowSums(data.7.recap)
-rowSums.7.first <- rowSums(data.7.first)
-
-# those that were caught first time at the 7th occasion
-idx <- 37
-data.37.first <- data.0[(cumulative.capture[,(idx-1)] == 0 & cumulative.capture[, idx] == 1), idx:ncol(data.0)]
-
-# those that were caught before and at the 7th occasion
-data.37.recap <- data.0[(cumulative.capture[, (idx-1)] > 0 & data.0[,idx] == 1), idx:ncol(data.0)] #%>%
-
-# look at the recaptures, given they were caught on the 7th occasion. 
-rowSums.37.recap<- rowSums(data.37.recap)
-rowSums.37.first <- rowSums(data.37.first)
-
-```
-
-For the 4th occasion, the maximum number of recaptures for those that were caught first time at the 4th occasion was ```r max(rowSums.4.first)``` whereas that for those turtles that were caught before the 4th and at the 4th occasions was ```r max(rowSums.4.recap)```. For the 7th occasion,  the maximum number of recaptures for those that were caught first time at the 7th occasion was ```r max(rowSums.7.first)``` whereas that for those turtles that were caught before the 7th and at the 7th occasions was ```r max(rowSums.7.recap)```. For the 37th occasion,  the maximum number of recaptures for those that were caught first time at the 37th occasion was ```r max(rowSums.37.first)``` whereas that for those turtles that were caught before the 37th and at the 37th occasions was ```r max(rowSums.37.recap)```. I don't know why the 37th occasion was flagged... 
-
-##### TEST2.CT
+##### TEST2.CT {-}
 
 TEST2.CT tests the hypothesis that "there is no difference in the probability of being recaptured at t+1 between those captured and not captured at occasion t, conditional on presence at both occasions.  
 
