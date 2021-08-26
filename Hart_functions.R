@@ -1,4 +1,93 @@
 
+capture.recapture.stats <- function(loc, dat.1, Ei.inputs, save.fig, fig.height, fig.width){
+  
+  CJS.data <- dat2CJS(dat.1, save.file = FALSE)
+  n.occ <- ncol(CJS.data$data)
+  n.caught <- colSums(CJS.data$data)
+  
+  p.captures <- ggplot(dat.1) + 
+    geom_point(aes(x = DATE,  y = ID)) +
+    geom_path(aes(x = DATE, y = ID)) +
+    theme(axis.text.y = element_blank()) +
+    labs(title = loc)
+  
+  if (save.fig)
+    ggsave(filename = paste0("figures/Ei_capture_history_", loc, ".png"),
+           plot = p.captures, device = "png", dpi = 600,
+           height = fig.height, width = fig.width)
+  
+  n.caps <- rowSums(CJS.data$data) %>% 
+    data.frame() %>% 
+    rownames_to_column(var = "ID") 
+  
+  colnames(n.caps) <- c("ID", "n")   # there has to be a better way but... 
+  
+  p.n.captures <- ggplot(data = n.caps) + 
+    geom_histogram(aes(x = n), binwidth = 1) +
+    labs(title = loc)
+  
+  if (save.fig)
+    ggsave(filename = paste0("figures/Ei_capture_histogram_", loc, ".png"),
+           plot = p.n.captures, device = "png", dpi = 600,
+           height = fig.height, width = fig.width)
+  
+  tmp.counts <- t(apply(CJS.data$data, MARGIN = 1, FUN = n.captures))
+  tmp.counts.df <- data.frame(count.captures(tmp.counts)) 
+  rownames(tmp.counts.df) <- 1:max(tmp.counts)
+  colnames(tmp.counts.df) <- colnames(CJS.data$data)
+  tmp.counts.df <- rownames_to_column(tmp.counts.df, var = "n.recaptures")
+  tmp.counts.df %>% pivot_longer(!n.recaptures, names_to = "Date", values_to = "Freq") -> counts.freq
+  
+  p.n.recap <- ggplot(counts.freq) + 
+    geom_col(aes(x = Date, y = Freq, fill = n.recaptures)) + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5),
+          legend.position = "top") +
+    ylab("# individuals") + labs(fill = "# recaptures", title = loc)
+  
+  
+  if (save.fig)
+    ggsave(filename = paste0("figures/Ei_recaptures_", loc, ".png"),
+           plot = p.n.recap, device = "png", dpi = 600,
+           height = fig.height, width = fig.width)
+  
+  loc.stats <- list(CJS.data = CJS.data,
+                    n.occ = n.occ,
+                    n.caught = n.caught,
+                    n.caps = n.caps)
+  
+  return(loc.stats)
+}
+
+# Counts the number of individuals that are caught x times at each capture occasion. Use this with output from n.captures.
+count.captures <- function(x){
+  max.n <- max(x)
+  out.table <- matrix(nrow = max.n, ncol = ncol(x))
+  for (k in 1:ncol(x)){
+    for (k1 in 1:max.n){
+      out.table[k1, k] <- sum(x[,k] == k1)
+    }
+  }
+  return(out.table)
+}
+
+
+# this function enumerate the capture sequence for each individual. Rather than having 0s and 1s, they are turned into 0s and 1s, 2s, 3s, etc. Cumulative sum but keeping zeros as zeros. Use it with apply to a capture history dataframe. When used with apply, the output is individuals in columns and capture occasions in rows. So, transform the output to make it comparable to the capture history matrix.
+#t(apply(X, MARGIN = 1, FUN = n.captures)), where X is the capture history matrix/dataframe
+n.captures <- function(x){
+  #x.1 <- vector(mode = "numeric", length = ncol(x))
+  x.1 <- x[1]
+  for (k in 2:length(x)){
+    if (x[k] > 0) { 
+      x[k] <- x.1 + x[k]
+      x.1 <- x[k]
+    }
+  }
+  
+  return(x)
+}
+
+
+
 extract.Nhats <- function(Cm.inputs, real.estimates){
   data.0 <- Cm.inputs$CJS.data$data
   
