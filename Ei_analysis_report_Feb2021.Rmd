@@ -158,7 +158,7 @@ if (save.fig)
 
 
 ```{r plot.change.CCL, echo=FALSE, cache=TRUE, fig.cap= "Change in size distributions of hawksbill turtles that were caught first time"}
-knitr::include_graphics(paste0("figures/Cm_ChangeInSize.png"))
+knitr::include_graphics(paste0("figures/Ei_ChangeInSize.png"))
 ```
 
 

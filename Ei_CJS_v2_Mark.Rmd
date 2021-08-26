@@ -131,7 +131,7 @@ ddl$p$tsm[ddl$p$age == 0] <- 2
 
 Ei.results <- do_analysis(dp = dp, ddl = ddl)
 
-Cm.CJS.input <- list(raw.data = dat.1.Cm,
+Ei.CJS.input <- list(raw.data = dat.1,
                      CJS.data = CJS.data,
                      CH.1 = CH.1,
                      CH.R2ucare = CH.2,
@@ -142,16 +142,16 @@ Cm.CJS.input <- list(raw.data = dat.1.Cm,
                      ddl = ddl,
                      run.date = Sys.Date())
 
-saveRDS(Cm.results, file = "RData/CJS_Cm_RMark.rds")
-saveRDS(Cm.CJS.input, file = "RData/CJS_Cm_RMark_input.rds")
+saveRDS(Ei.results, file = "RData/CJS_Ei_RMark.rds")
+saveRDS(Ei.CJS.input, file = "RData/CJS_Ei_RMark_input.rds")
 
 ```
 
 Export to Mark to see Release GOF or median c-hat.
 ```{r}
 export.MARK(dp, 
-            project.name = "Mancini_Cm", 
-            model = Cm.results$Phi.tsm.p.t, 
+            project.name = "Hart_Ei", 
+            model = Ei.results$Phi.tsm.p.t, 
             replace = T, 
             chat = 5.6)
 ```
@@ -163,13 +163,13 @@ Release output is similar to what I find below from R2ucare.
 Compare results using AICc:
 
 ```{r}
-model.table(Cm.results)
+model.table(Ei.results)
 ```
 
 According to AICc, the best one is Phi(tsm)p(time). But c-hat > 4 (4.75)!  This is better than before but, obviously, this isn't a great model... What to do? 
 
 Look at the estimates:
 ```{r}
-Cm.results$Phi.tsm.p.t$results$real
+Ei.results$Phi.tsm.p.t$results$real
 ```
 
